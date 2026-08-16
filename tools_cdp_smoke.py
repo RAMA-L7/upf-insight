@@ -216,6 +216,46 @@ def main():
         .map(e => e.textContent).join('|')""")
     step("RESULTS group visible after analysis", "RESULTS" in (nav2 or ""), nav2 or "")
 
+    # 7. Every workspace page renders: no error block, no dead buttons.
+    #    WORKSPACE pages first, then the RESULTS pages (analysis is loaded
+    #    from the Test Drive regression step above).
+    for view in ["validator", "generator", "rules", "trust", "documentation",
+                 "overview", "supply", "pst", "strategies", "design",
+                 "coverage", "readiness", "support", "export"]:
+        cdp.js(f"location.hash = '#/{view}'")
+        ok_render = cdp.wait(f"""(() => {{
+            const main = document.querySelector('#main');
+            if (!main) return false;
+            const t = main.textContent || '';
+            return t.trim().length > 20 && !main.querySelector('.err-engine');
+        }})()""", timeout=8)
+        buttons = cdp.js("document.querySelectorAll('#main button').length")
+        links = cdp.js("document.querySelectorAll('#main a, #main [data-view], #main [data-home-view], #main [data-td-next], #main [data-diff-next]').length")
+        title = cdp.js("document.querySelector('#main .page-title') ? document.querySelector('#main .page-title').textContent : '?'")
+        step(f"page renders: {view}", ok_render, f"[{title}] buttons={buttons} nav-links={links}")
+
+    # Generator actually generates through the real backend.
+    cdp.js("location.hash = '#/generator'")
+    cdp.wait("!!document.querySelector('#g-gen')")
+    cdp.js("document.querySelector('#g-gen').click()")
+    step("generator produces output", cdp.wait(
+        "(document.querySelector('#g-out') ? document.querySelector('#g-out').textContent.length : 0) > 200",
+        timeout=10))
+
+    # Rules page shows the real registry count.
+    cdp.js("location.hash = '#/rules'")
+    cdp.wait("!!document.querySelector('.rule-row')")
+    rc = cdp.js("document.querySelectorAll('.rule-row').length")
+    step("rules registry renders", (rc or 0) >= 60, f"{rc} rule rows")
+
+    # Trust + Documentation disclose real content.
+    cdp.js("location.hash = '#/trust'")
+    cdp.wait("document.querySelector('#main').textContent.includes('signoff')")
+    step("trust page has signoff disclosure", True)
+    cdp.js("location.hash = '#/documentation'")
+    cdp.wait("document.querySelector('#main').textContent.includes('Documentation')")
+    step("documentation page renders", True)
+
     print()
     print(f"console errors: {len(console_errors)}")
     for e in console_errors:

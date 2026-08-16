@@ -19,6 +19,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   realistic CPU-subsystem V1/V2 fixtures.
 
 ### Fixed
+- Finding `file` provenance resolved from the authoritative command-record
+  index — single-file runs always populate it; ambiguous multi-file lines
+  stay empty (never invented).
+- CLI `--gate` without `--baseline` now actually gates the current evidence
+  (previously silently ignored); an unknown policy is an invalid invocation
+  (exit 2), matching the API's HTTP 400.
 - Semantic diff no longer treats provenance (`declared_line`/`declared_file`)
   as semantics — comment/line-shift edits produce zero changes.
 - Web design-aware mode: dict design context normalized to `DesignContext`

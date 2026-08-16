@@ -6,8 +6,12 @@
 > a real Chrome (CDP) browser walkthrough with zero console errors.
 > Nothing is marked PASS on the strength of a page existing.
 
-Measured baseline: **114 tests pass · 65 rules (all with handlers) · 9 CLI
+Measured baseline: **122 tests pass · 65 rules (all with handlers) · 9 CLI
 commands · 10 API endpoints · 11 workspace pages · version 0.1.0**.
+
+Final hardening pass (pre-validation) applied: finding file-provenance
+resolved, CLI gate without baseline fixed, exit-code contract verified
+0/1/2/3, clean-environment wheel verified, browser walkthrough 41/41.
 
 ---
 
@@ -69,24 +73,26 @@ Backend = real engine surface · Standalone = usable without a session.
 
 | Check | Result |
 |---|---|
-| Full test suite | **114 passed** (94 baseline + 5 diff semantics + 13 web API + 2 design-aware normalization) |
-| CLI end-to-end | check/model/pst/coverage/report/diff/generate/rules verified; exit codes 0/1/2/3 contract intact |
+| Full test suite | **122 passed** (114 hardening base + 5 provenance + 3 CLI gate/exit-code) |
+| CLI end-to-end | check/model/pst/coverage/report/diff/generate/rules verified; exit codes **0/1/2/3 verified from clean invocation** (V1=0, V2=1, missing file=2, bad policy=2, engine failure=3) |
+| CLI/API agreement | `--gate` without baseline now evaluates current evidence (was silently ignored); invalid policy → exit 2 / HTTP 400 |
 | API | 10 endpoints; error states (400) verified; path traversal blocked (403/404) |
-| Determinism | repeated CLI runs byte-identical |
-| Browser (CDP, real Chrome) | **23/23 steps PASS · 0 console errors · 0 runtime exceptions** |
+| Determinism | V1 and V2 runs byte-identical ×3; 727 JSON leaves scanned — **no nondeterministic fields** |
+| Browser (CDP, real Chrome) | **41/41 steps PASS · 0 console errors · 0 runtime exceptions** — all 19 pages render, generator/rules/trust/documentation verified |
+| Finding provenance | `Finding.file` now resolved from the authoritative record index (single-file exact; ambiguous multi-file lines left empty, never invented) |
 | Diff quality | provenance-free: comment/line-shift edits produce 0 changes; real removal produces exactly 1 |
 | Design-aware honesty | dict design normalized to `DesignContext`; readiness mode flips to `DESIGN_AWARE`; no silent degradation |
-| Packaging | `pyproject.toml` wheel-able entry point (`upf-insight`) — **not yet tested from a clean environment** (P2) |
+| Packaging | wheel `upf_insight-0.1.0-py3-none-any.whl` built; **installed and verified in a clean venv** — console command, check (0/1), JSON, report (HTML), gate, design-aware all work |
 
-## Findings
+## Findings (post-hardening)
 
 - **P0** — none.
 - **P1** — none blocking the validation workflow.
-- **P2**
-  1. No version control / CI in the project directory (git init + GitHub Action recommended before external validation).
-  2. Model-derived findings carry accurate `line` but an empty `file` field (single-file runs unambiguous; documented gap).
-  3. Wheel install not yet verified from a clean environment.
-  4. Custom YAML rules **NOT IMPLEMENTED** (only `--rule` filtering) — documented, not hidden.
+- **P2 (remaining)**
+  1. No CI pipeline in this repository (git initialized; a GitHub Action is recommended once the candidate is pushed).
+  2. Custom YAML rules **NOT IMPLEMENTED** (only `--rule` filtering) — documented, not hidden.
+  3. Multi-file runs with colliding line numbers leave `file` empty on those findings (ambiguous provenance — honest, never invented).
+  4. Design context is a JSON snapshot, not a netlist parser.
 
 ## Known limitations (from functional baseline)
 

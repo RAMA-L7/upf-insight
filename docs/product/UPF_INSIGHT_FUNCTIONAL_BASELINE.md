@@ -106,9 +106,11 @@ visible from the catalog.
 ## 5. Output contract
 
 - **Findings:** `{rule, severity, message, file, line, support}`.
-  Line is accurate for model-derived findings; the file field is currently
-  empty on model-derived findings (documented gap — single-file runs are
-  unambiguous, multi-file runs attribute by line).
+  `line` is accurate for model-derived findings and `file` is resolved from
+  the authoritative command-record index: single-file runs always populate
+  it; multi-file runs populate it per file, except when the same line number
+  appears in more than one file, where the field stays empty (ambiguous
+  provenance — never invented).
 - **Exit codes:** `0` pass · `1` gate failed / issues · `2` invalid
   invocation · `3` engine failure. Engine failure can never produce a pass.
 - **Support boundary:** counts per status + human notes, always emitted.
