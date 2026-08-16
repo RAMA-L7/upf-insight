@@ -1,0 +1,32 @@
+# example.iso_bad.upf — golden fixture exercising the isolation rule family.
+# One power switch makes vdd_sw switchable; a second domain is always-on.
+upf_version 3.0
+set_design_top iso_top
+
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_port vdd_port -direction in
+create_supply_port vss_port -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports {vdd_port}
+connect_supply_net vss -ports {vss_port}
+create_supply_net vdd_sw -resolve net
+connect_supply_net vdd_sw -ports vdd
+create_supply_set primary -function {power vdd} -function {ground vss}
+create_supply_set sw -function {power vdd_sw} -function {ground vss}
+
+# vdd_sw comes out of a power switch -> switchable
+create_power_switch psw1 -input_supply_port vdd -output_supply_port vdd_sw \
+    -control_port en
+
+create_power_domain PD_SW  -elements {u_sw}  -primary_supply_set sw
+create_power_domain PD_AO  -elements {u_ao}  -primary_supply_set primary
+
+# Bad: isolation on the switchable domain located 'self' (loses power)
+set_isolation iso_self -domain PD_SW -location self \
+    -isolation_supply sw -clamp_value 2 -applies_to outputs \
+    -isolation_signal iso_en
+# Bad: isolation supply is the switch output (not always-on)
+set_isolation iso_sw -domain PD_AO -location parent \
+    -isolation_supply vdd_sw -clamp_value 1 -applies_to inouts

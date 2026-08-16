@@ -1,0 +1,25 @@
+# example.pst_bad.upf — golden fixture exercising the PST rule family.
+upf_version 3.0
+set_design_top pst_top
+
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports vdd
+connect_supply_net vss -ports vss
+
+# State 'ON' on vss is declared but never used -> UPF-030.
+# State 'LOW' on vdd is declared but never used -> UPF-030.
+add_port_state vdd -state {ON 1.0} -state {OFF 0.0} -state {LOW 0.5}
+add_port_state vss -state {ON 0.0}
+
+create_pst pst_main -supplies {vdd vss}
+# S3 references vdd state 'RET' that was never declared -> UPF-031.
+# S1 and S2 declare the same combination -> UPF-034.
+# Transition references state 'GHOST' -> UPF-035.
+add_pst_state S1 -pst pst_main -state {vdd ON vss ON}
+add_pst_state S2 -pst pst_main -state {vdd ON vss ON}
+add_pst_state S3 -pst pst_main -state {vdd RET}
+add_pst_state S4 -pst pst_main -state {vdd OFF vss ON}
+add_state_transition S1 -next_state GHOST

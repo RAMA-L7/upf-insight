@@ -1,0 +1,17 @@
+{
+  "instances": {
+    "u_cpu": {"module": "cpu_core", "sequential": true},
+    "u_sram": {"module": "sram", "sequential": true},
+    "u_io": {"module": "io_block", "sequential": false}
+  },
+  "ports": ["clk", "reset_n", "iso_en", "save", "restore"],
+  "signals": {
+    "bus_req": {"driver": "u_cpu", "receivers": ["u_io"]},
+    "mem_out": {"driver": "u_sram", "receivers": ["u_cpu"]}
+  },
+  "pg_pins": {
+    "cpu_core": ["VDD", "VSS"],
+    "sram": ["VDD_SRAM", "VSS"],
+    "io_block": ["VDD_IO", "VSS"]
+  }
+}

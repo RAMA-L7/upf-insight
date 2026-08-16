@@ -1,0 +1,31 @@
+# example.design_bad.upf — fixture exercising the design-aware layer (UPF-080..084).
+# Must be validated with --netlist tests/examples/example.design.json.
+upf_version 3.0
+set_design_top soc_top
+
+create_supply_port vdd -direction in
+create_supply_port vdd_io -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vdd_io -resolve port
+create_supply_net vdd_sw -resolve net
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports vdd
+connect_supply_net vdd_io -ports vdd_io
+connect_supply_net vss -ports vss
+
+create_supply_set primary -function {power vdd} -function {ground vss}
+create_supply_set io -function {power vdd_io} -function {ground vss}
+
+create_power_switch sw -input_supply_port vdd -output_supply_port vdd_sw \
+    -control_port sw_en
+create_power_domain PD_CORE -elements {u_cpu} -primary_supply_set primary
+create_power_domain PD_IO   -elements {u_io}   -primary_supply_set io
+# UPF-080: u_ghost does not exist in the netlist.
+create_power_domain PD_GHOST -elements {u_ghost} -primary_supply_set primary
+# PD_SRAM is switchable (vdd_sw) and holds sequential u_sram -> UPF-083
+# fires (no retention) and UPF-084 fires (vdd_sw not a PG pin of sram).
+create_power_domain PD_SRAM -elements {u_sram}
+set_domain_supply_net PD_SRAM -primary_power_net vdd_sw
+# UPF-081: sw_en is the switch control but is not in the design ports/signals.
+set_isolation iso_core -domain PD_CORE -isolation_signal iso_en -clamp_value 0

@@ -1,0 +1,29 @@
+# example.broken.upf — deliberately faulty UPF for exercising the rule engine.
+upf_version 3.0
+set_design_top soc_top
+
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+
+# Supply set missing a power/ground function -> UPF-023
+create_supply_set nofunc
+
+# Domain referencing undefined supply set (not flagged at this layer) and
+# no primary supply assignment -> UPF-020
+create_power_domain PD_BAD -elements {u_foo}
+
+# Strategy referencing a domain that is never created -> UPF-011
+set_isolation iso_bad -domain PD_GHOST -clamp_value 0 -applies_to outputs
+
+# Retention with no elements and an undeclared supply -> UPF-050 / UPF-052
+set_retention ret_bad -domain PD_BAD -retention_supply nope_ret \
+    -save_signal save -restore_signal restore
+
+# Isolation with no control signal -> UPF-045
+set_isolation iso_nocontrol -domain PD_BAD -isolation_supply primary \
+    -clamp_value 0 -applies_to outputs
+
+# Unknown command -> UPF-001
+make_banana upf

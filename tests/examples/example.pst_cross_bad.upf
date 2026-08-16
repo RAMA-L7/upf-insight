@@ -1,0 +1,45 @@
+# example.pst_cross_bad.upf — PST cross-state transition legality fixture.
+#
+# Exercises the strict cross-state rules:
+#   * UPF-037 — DRV is switchable and powers down (S_ON -> S_OFF) while the
+#               always-on RCV domain stays ON; DRV has no isolation/clamp.
+#   * UPF-038 — DRV2's power net (vdd_sw2, a power-switch output) never appears
+#               in any PST row, so its tri-state/floating behavior is unverifiable.
+upf_version 3.0
+set_design_top x_top
+
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports vdd
+connect_supply_net vss -ports vss
+
+# Always-on rail plus two switched rails.
+create_supply_net vdd_sw
+create_power_switch sw1 -input_supply_port vdd -output_supply_port vdd_sw \
+    -control_port sw_en -on_state {sw_en on}
+create_supply_net vdd_sw2
+create_power_switch sw2 -input_supply_port vdd -output_supply_port vdd_sw2 \
+    -control_port sw2_en -on_state {sw2_en on}
+
+create_supply_set ALWAYS -function {power vdd} -function {ground vss}
+create_supply_set SW -function {power vdd_sw} -function {ground vss}
+create_supply_set SW2 -function {power vdd_sw2} -function {ground vss}
+
+# Receiver: always-on domain (stays ON).
+create_power_domain RCV -elements {u_rcv} -primary_supply_set ALWAYS
+# Driver: switchable domain that powers down -> UPF-037 (un-isolated).
+create_power_domain DRV -elements {u_drv} -primary_supply_set SW
+# Driver: switchable domain whose net is never modeled by the PST -> UPF-038.
+create_power_domain DRV2 -elements {u_drv2} -primary_supply_set SW2
+
+add_port_state vdd -state {ON 1.0} -state {OFF 0.0}
+add_port_state vdd_sw -state {ON 1.0} -state {OFF 0.0}
+add_port_state vss -state {ON 0.0}
+
+create_pst p -supplies {vdd vdd_sw vss}
+add_pst_state S_ON -pst p -state {vdd ON vdd_sw ON vss ON}
+add_pst_state S_OFF -pst p -state {vdd ON vdd_sw OFF vss ON}
+add_state_transition S_ON -next_state S_OFF
+add_state_transition S_OFF -next_state S_ON

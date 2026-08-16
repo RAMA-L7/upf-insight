@@ -1,0 +1,35 @@
+# example.soc.upf — small golden example for UPF-Insight validation.
+# A typical 3-domain SoC with always-on logic, isolation, and retention.
+upf_version 3.0
+set_design_top soc_top
+
+# ---- Supply network ----
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports vdd
+connect_supply_net vss -ports vss
+
+create_supply_set primary -function {power vdd} -function {ground vss}
+create_supply_set vdd_ret -function {power {net vdd_ret_net}} -function {ground vss}
+
+# ---- Power domains ----
+create_power_domain PD_CORE -elements {u_cpu} -primary_supply_set primary
+create_power_domain PD_IO   -elements {u_io}   -primary_supply_set primary
+create_power_domain PD_SRAM -elements {u_sram} -primary_supply_set vdd_ret
+
+# ---- Power states ----
+add_port_state vdd -state {ON 1.0} -state {OFF 0.0}
+add_port_state vss -state {ON 0.0}
+create_pst pst_soc -supplies {vdd vss}
+add_pst_state PS_ON  -pst pst_soc -state {vdd ON vss ON}
+add_pst_state PS_OFF -pst pst_soc -state {vdd OFF vss ON}
+add_state_transition PS_ON -next_state PS_OFF
+add_state_transition PS_OFF -next_state PS_ON
+
+# ---- Strategies ----
+set_isolation iso_core_to_io -domain PD_CORE -isolation_supply primary \
+    -clamp_value 0 -applies_to outputs -isolation_signal iso_en
+set_retention ret_sram -domain PD_SRAM -retention_supply vdd_ret \
+    -save_signal save -restore_signal restore

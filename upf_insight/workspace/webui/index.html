@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>UPF-Insight — Power-Intent Intelligence for Digital Design</title>
+  <meta name="description" content="UPF-Insight — deterministic, offline-capable IEEE 1801 (UPF) power-intent validation and pre-implementation analysis.">
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+  <div id="bg" aria-hidden="true"></div>
+
+  <div class="app">
+    <!-- ═════════════ COMMAND BAR (persistent top) ═════════════ -->
+    <header class="cmdbar" id="cmdbar">
+      <div class="cmdbar-brand">
+        <svg class="brand-mark" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M3.5 2.5v8.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.5 2.5h4.4a2.6 2.6 0 0 1 0 5.2H3.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 7.7 11.6 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="9.2" cy="14.2" r="0.9" fill="currentColor"/>
+        </svg>
+        <div class="brand-text">
+          <span class="brand-name">UPF<b>-Insight</b></span>
+          <span class="brand-sub">power-intent validator</span>
+        </div>
+      </div>
+
+      <!-- Search (filters navigation — real, local) -->
+      <div class="cmdbar-search">
+        <svg class="cs-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.6 10.6 L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input id="cmd-search" type="text" placeholder="Search navigation…" aria-label="Search navigation" autocomplete="off" spellcheck="false">
+        <kbd class="cs-kbd">/</kbd>
+      </div>
+
+      <div class="cmdbar-actions">
+        <button class="cmd-btn" id="cmd-open-session" type="button" title="Current session and recent sessions (this browser tab)">Open Session</button>
+        <button class="cmd-btn" id="cmd-import" type="button" title="Go to Validate and import a UPF file">Import</button>
+        <button class="cmd-btn" id="cmd-quick" type="button" title="Frequent workspace actions">Quick Actions</button>
+        <button class="cmd-btn" id="cmd-settings" type="button" title="Workspace settings">Settings</button>
+        <span class="ver mono" id="ver">v0.1.0</span>
+      </div>
+
+      <div class="cmd-menu" id="menu-session" hidden role="menu" aria-label="Sessions"></div>
+      <div class="cmd-menu" id="menu-quick" hidden role="menu" aria-label="Quick actions"></div>
+      <div class="cmd-menu" id="menu-settings" hidden role="menu" aria-label="Settings"></div>
+    </header>
+
+    <!-- ═════════════ ANALYSIS SESSION HEADER ═════════════ -->
+    <div class="session-head" id="session-head" role="status" aria-live="polite">
+      <span class="sh-session" id="session-name" title="Analysis session">Untitled session</span>
+      <span class="sh-status" id="session-status"></span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span class="ctx-item mono" data-ctx="file" title="UPF file">—</span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span class="ctx-item mono" data-ctx="design" title="Design context">no design</span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span class="ctx-item mono" data-ctx="mode" title="Analysis mode">—</span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span id="ctx-trust"></span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span id="ctx-readiness"></span>
+      <span class="sh-sep" aria-hidden="true"></span>
+      <span class="ctx-item mono" id="session-time" title="Analysis timestamp"></span>
+      <span class="sh-right mono" id="session-scope"></span>
+    </div>
+
+    <div class="body">
+      <!-- ═════════════ LEFT NAV (grouped engineering workflow) ═════════════ -->
+      <nav class="nav" id="nav" aria-label="Workspace navigation">
+        <div class="nav-scroll">
+          <div id="nav-groups"></div>
+          <div class="nav-empty mono" id="nav-empty" hidden>no navigation matches</div>
+        </div>
+        <div class="nav-foot">
+          <span class="mono" id="nav-foot">deterministic · offline · no LLM</span>
+        </div>
+      </nav>
+
+      <!-- ═════════════ CONTENT CANVAS ═════════════ -->
+      <main class="main" id="main" tabindex="-1"></main>
+    </div>
+
+    <!-- ═════════════ SESSION STATUS BAR ═════════════ -->
+    <footer class="rail" id="rail" aria-live="polite"></footer>
+  </div>
+
+  <!-- Right inspector (contextual finding / object detail, 400px) -->
+  <aside class="inspector" id="inspector" aria-hidden="true">
+    <div class="inspector-head">
+      <span class="inspector-title" id="inspector-title">Finding</span>
+      <button class="icon-btn" id="inspector-close" aria-label="Close inspector" title="Close (Esc)">✕</button>
+    </div>
+    <div class="inspector-body" id="inspector-body"></div>
+  </aside>
+  <div class="inspector-backdrop" id="inspector-backdrop" hidden></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <div style="padding:40px;font-family:Inter,sans-serif;color:#18181B;background:#FFFFFF">
+      UPF-Insight requires JavaScript. All analysis runs locally on your machine — no data leaves your browser.
+    </div>
+  </noscript>
+
+  <script type="module" src="/assets/js/theme.js"></script>
+  <script type="module" src="/assets/js/components.js"></script>
+  <script type="module" src="/assets/js/viz.js"></script>
+  <script type="module" src="/assets/js/pages.js"></script>
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "upf-insight"
+version = "0.1.0"
+description = "UPF-Insight — deterministic power-intent intelligence for IEEE 1801 (UPF): validate, model, analyze and diff UPF files before power-aware implementation. No EDA tool and no LLM required."
+readme = "README.md"
+license = "MIT"   # PEP 639 SPDX expression; LICENSE file ships via license-files
+requires-python = ">=3.10"
+keywords = ["upf", "vlsi", "power-intent", "power", "low-power", "ieee-1801", "eda", "signoff"]
+authors = [
+    {name = "RAMA-L7"},
+]
+
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+web = []
+dev = ["pre-commit>=3.0", "pytest>=7.0"]
+all = ["pre-commit>=3.0", "pytest>=7.0"]
+
+[project.urls]
+"Homepage" = "https://github.com/RAMA-L7/upf-insight"
+"Repository" = "https://github.com/RAMA-L7/upf-insight.git"
+"Bug Tracker" = "https://github.com/RAMA-L7/upf-insight/issues"
+
+[project.scripts]
+upf-insight = "upf_insight.cli.cli:main"
+upfi = "upf_insight.cli.cli:main"
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+
+[tool.setuptools.packages.find]
+include = ["upf_insight*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.upf", "*.tcl"]
+"upf_insight.workspace.webui" = ["index.html", "assets/css/*", "assets/js/*"]
+"upf_insight.evidence.manifest" = ["*.json"]
+"upf_insight.examples" = ["*.upf", "*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

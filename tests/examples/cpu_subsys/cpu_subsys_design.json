@@ -1,0 +1,29 @@
+{
+  "instances": {
+    "u_cpu":  {"module": "cpu_core", "sequential": true},
+    "u_ao":   {"module": "pmu_ctl",  "sequential": true},
+    "u_io":   {"module": "io_block", "sequential": false},
+    "u_sram": {"module": "sram_ctl", "sequential": true}
+  },
+  "ports": [
+    "clk", "reset_n",
+    "pwr_ok", "iso_en", "save", "restore",
+    "dma_req", "dma_ack", "apb_paddr", "apb_pwdata"
+  ],
+  "signals": {
+    "dma_req":  {"driver": "u_cpu", "receivers": ["u_io"]},
+    "dma_ack":  {"driver": "u_io",  "receivers": ["u_cpu"]},
+    "apb_paddr": {"driver": "u_io", "receivers": ["u_cpu", "u_sram"]},
+    "apb_pwdata": {"driver": "u_io", "receivers": ["u_cpu"]},
+    "pwr_ok":   {"driver": "u_ao",  "receivers": ["u_cpu"]},
+    "iso_en":   {"driver": "u_ao",  "receivers": ["u_cpu", "u_io"]},
+    "save":     {"driver": "u_ao",  "receivers": ["u_cpu", "u_sram"]},
+    "restore":  {"driver": "u_ao",  "receivers": ["u_cpu", "u_sram"]}
+  },
+  "pg_pins": {
+    "cpu_core": ["VDD_SW", "VSS"],
+    "pmu_ctl":  ["VDD_AO", "VSS"],
+    "io_block": ["VDD_IO", "VSS"],
+    "sram_ctl": ["VDD_RET", "VSS"]
+  }
+}

@@ -1,0 +1,29 @@
+# example.syn_ref_bad.upf — golden fixture exercising syntax + reference-layer rules.
+upf_version 9.9
+set_design_top syn_top
+
+# UPF-006: unbalanced brace on this command.
+create_supply_port vdd -direction {in
+
+# UPF-002: -bogus is not a legal option for create_supply_net.
+create_supply_net vdd -bogus on
+
+# UPF-005: deprecated UPF 1.0/2.0 form.
+add_power_state PON -state {vdd ON}
+
+# UPF-003: set_isolation requires -domain.
+set_isolation iso_no_dom -clamp_value 0
+
+# UPF-010: 'vss' is never defined as a net/port/set.
+create_supply_set bad_set -function {ground vss}
+
+# UPF-013: duplicate domain.
+create_power_domain PD1 -elements {u1}
+create_power_domain PD1 -elements {u2}
+
+# UPF-014: strategy uses PD2 before it is created.
+set_isolation iso_early -domain PD2 -clamp_value 0
+create_power_domain PD2 -elements {u3}
+
+# UPF-012: wildcard instance path does not resolve.
+create_power_domain PD3 -elements {*}

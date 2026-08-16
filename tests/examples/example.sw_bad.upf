@@ -1,0 +1,25 @@
+# example.sw_bad.upf — golden fixture exercising the power-switch rule family.
+upf_version 3.0
+set_design_top sw_top
+
+create_supply_port vdd -direction in
+create_supply_port vss -direction in
+create_supply_net vdd -resolve port
+create_supply_net vss -resolve port
+connect_supply_net vdd -ports vdd
+connect_supply_net vss -ports vss
+create_supply_set primary -function {power vdd} -function {ground vss}
+
+# Bad: output supply vdd_ghost is never declared anywhere -> UPF-070.
+create_power_switch psw_bad -input_supply_port vdd -output_supply_port vdd_ghost \
+    -control_port sw_en
+
+# Good switch into a real net that no domain consumes -> UPF-073.
+create_supply_net vdd_sw -resolve net
+create_power_switch psw_ok -input_supply_port vdd -output_supply_port vdd_sw \
+    -control_port sw_en
+
+# connect_supply_net to an unknown target -> UPF-024.
+connect_supply_net vdd_sw -ports {ghost_port}
+
+create_power_domain PD_SW -elements {u_sw} -primary_supply_set primary
