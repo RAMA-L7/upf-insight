@@ -2,7 +2,7 @@
 
 Mirrors the sdc-tools `policy_engine` contract: policies are inert data
 (JSON/YAML), interpreted against a fixed schema. A policy selects WHICH
-existing evidence fails the gate — it never changes what the validator
+existing evidence fails the gate - it never changes what the validator
 detects. Engine failure always exits 3 regardless of policy.
 
 Built-in policies (expressed in the same schema):

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <link rel="icon" href="data:,">
-  <title>UPF-Insight — Power-Intent Intelligence for Digital Design</title>
-  <meta name="description" content="UPF-Insight — deterministic, offline-capable IEEE 1801 (UPF) power-intent validation and pre-implementation analysis.">
+  <title>UPF-Insight - Power-Intent Intelligence for Digital Design</title>
+  <meta name="description" content="UPF-Insight - deterministic, offline-capable IEEE 1801 (UPF) power-intent validation and pre-implementation analysis.">
   <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body>
@@ -28,7 +28,7 @@
         </div>
       </div>
 
-      <!-- Search (filters navigation — real, local) -->
+      <!-- Search (filters navigation - real, local) -->
       <div class="cmdbar-search">
         <svg class="cs-icon" viewBox="0 0 16 16" aria-hidden="true">
           <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
@@ -39,16 +39,9 @@
       </div>
 
       <div class="cmdbar-actions">
-        <button class="cmd-btn" id="cmd-open-session" type="button" title="Current session and recent sessions (this browser tab)">Open Session</button>
-        <button class="cmd-btn" id="cmd-import" type="button" title="Go to Validate and import a UPF file">Import</button>
-        <button class="cmd-btn" id="cmd-quick" type="button" title="Frequent workspace actions">Quick Actions</button>
-        <button class="cmd-btn" id="cmd-settings" type="button" title="Workspace settings">Settings</button>
+        <button class="cmd-btn cmd-home" id="cmd-home" type="button" title="Go to the tool home"><span class="ch-icon" aria-hidden="true">⌂</span><span>Home</span></button>
         <span class="ver mono" id="ver">v0.1.0</span>
       </div>
-
-      <div class="cmd-menu" id="menu-session" hidden role="menu" aria-label="Sessions"></div>
-      <div class="cmd-menu" id="menu-quick" hidden role="menu" aria-label="Quick actions"></div>
-      <div class="cmd-menu" id="menu-settings" hidden role="menu" aria-label="Settings"></div>
     </header>
 
     <!-- ═════════════ ANALYSIS SESSION HEADER ═════════════ -->
@@ -56,11 +49,11 @@
       <span class="sh-session" id="session-name" title="Analysis session">Untitled session</span>
       <span class="sh-status" id="session-status"></span>
       <span class="sh-sep" aria-hidden="true"></span>
-      <span class="ctx-item mono" data-ctx="file" title="UPF file">—</span>
+      <span class="ctx-item mono" data-ctx="file" title="UPF file">-</span>
       <span class="sh-sep" aria-hidden="true"></span>
       <span class="ctx-item mono" data-ctx="design" title="Design context">no design</span>
       <span class="sh-sep" aria-hidden="true"></span>
-      <span class="ctx-item mono" data-ctx="mode" title="Analysis mode">—</span>
+      <span class="ctx-item mono" data-ctx="mode" title="Analysis mode">-</span>
       <span class="sh-sep" aria-hidden="true"></span>
       <span id="ctx-trust"></span>
       <span class="sh-sep" aria-hidden="true"></span>
@@ -103,9 +96,21 @@
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <!-- Command palette (Ctrl/Cmd+K or /) -->
+  <div class="palette" id="palette" hidden aria-hidden="true">
+    <div class="palette-box" role="dialog" aria-modal="true" aria-label="Command palette">
+      <div class="palette-input-row">
+        <span class="palette-prompt mono">›</span>
+        <input class="palette-input" id="palette-input" type="text" placeholder="Type a command or page…" autocomplete="off" spellcheck="false" aria-label="Command palette">
+        <kbd class="palette-kbd mono">esc</kbd>
+      </div>
+      <div class="palette-list" id="palette-list" role="listbox"></div>
+    </div>
+  </div>
+
   <noscript>
     <div style="padding:40px;font-family:Inter,sans-serif;color:#18181B;background:#FFFFFF">
-      UPF-Insight requires JavaScript. All analysis runs locally on your machine — no data leaves your browser.
+      UPF-Insight requires JavaScript. All analysis runs locally on your machine - no data leaves your browser.
     </div>
   </noscript>
 

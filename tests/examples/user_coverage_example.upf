@@ -1,0 +1,144 @@
+create_power_domain pd_top -include_scope
+create_power_domain pd_aon -elements {aon_wrapper}
+create_power_domain pd_gated -elements {pgd_wrapper}
+create_power_domain pd_gated_aon -elements {{aon_wrapper/aon_pgd_wrapper}}
+
+# Create Supply Ports
+create_supply_port VCCL -direction in -domain pd_top
+create_supply_port VCCH -direction in -domain pd_top
+create_supply_port GND -direction in -domain pd_top
+
+# Create Supply Nets
+create_supply_net VCCL -domain pd_top
+create_supply_net VCCH -domain pd_top
+create_supply_net GND -domain pd_top
+
+create_supply_net VCCL -domain pd_aon -reuse
+create_supply_net GND -domain pd_aon -reuse
+
+create_supply_net VCCH -domain pd_gated_aon –reuse
+create_supply_net VCCH_gated -domain pd_gated_aon
+create_supply_net GND -domain pd_gated_aon -reuse
+
+create_supply_net VCCL -domain pd_gated -reuse
+create_supply_net VCCL_gated -domain pd_gated
+create_supply_net GND -domain pd_gated -reuse
+
+# Connect Supply Nets with corresponding Ports
+connect_supply_net VCCL -ports VCCL
+connect_supply_net VCCH -ports VCCH
+connect_supply_net GND -ports GND
+
+# Establish Connections
+set_domain_supply_net pd_top -primary_power_net VCCL -primary_ground_net GND
+set_domain_supply_net pd_aon -primary_power_net VCCL -primary_ground_net GND
+set_domain_supply_net pd_gated_aon -primary_power_net VCCH_gated -primary_ground_net GND
+set_domain_supply_net pd_gated -primary_power_net VCCL_gated -primary_ground_net GND
+
+# Shut-Down Logic for pgd_wrapper & aon_pgd_wrapper
+create_power_switch sw_pgd_wrapper \
+-domain pd_gated \
+-input_supply_port “sw_VCCL VCCL ” \
+-output_supply_port “sw_VCCL_gated VCCL_gated” \
+-control_port “sw_pgd_en aon_wrapper/pmu/pgd_en” \
+-on_state “SW_PGD_ON sw_VCCL {!sw_pgd_en}”
+
+create_power_switch sw_aon_pgd_wrapper \
+-domain pd_gated_aon \
+-input_supply_port “sw_VCCH VCCH ” \
+-output_supply_port “sw_VCCH_gated VCCH_gated” \
+-control_port “sw_aon_pgd_en aon_wrapper/pmu/aon_pgd_en” \
+-on_state “SW_AONPGD_ON sw_VCCH {!sw_aon_pgd_en}”
+
+# Isolation strategy
+set_isolation isol_clamp1_sig_from_pgd \
+-domain pd_gated \
+-isolation_power_net VCCL \
+-isolation_ground_net GND \
+-clamp_value 1 \
+-elements {pgd_wrapper/sig2}
+
+set_isolation_control isol_clamp1_sig_from_pgd \
+-domain pd_gated \
+-isolation_signal aon_wrapper/pmu/isol_pgd_en \
+-isolation_sense low \
+-location parent
+
+set_isolation isol_clamp0_sig_from_pgd \
+-domain pd_gated \
+-isolation_power_net VCCL \
+-isolation_ground_net GND \
+-clamp_value 0 \
+-elements {pgd_wrapper/sig4}
+
+set_isolation_control isol_clamp0_sig_from_pgd \
+-domain pd_gated \
+-isolation_signal aon_wrapper/pmu/isol_pgd_en \
+-isolation_sense low \
+-location parent
+
+set_isolation isol_sig_from_aonpgd \
+-domain pd_gated_aon \
+-isolation_power_net VCCH \
+-isolation_ground_net GND \
+-clamp_value 1 \
+-elements {aon_wrapper/aon_pgd_wrapper/sig5}
+
+set_isolation_control isol_sig_from_aonpgd \
+-domain pd_gated_aon \
+-isolation_signal aon_wrapper/pmu/isol_aonpgd_en \
+-isolation_sense low \
+-location parent
+
+# Level Shifter strategy
+set_level_shifter LtoH_sig_to_aonpgd \
+-domain pd_gated_aon \
+-applies_to inputs \
+-rule low_to_high \
+-location self
+
+set_level_shifter HtoL_sig_from_aonpgd \
+-domain pd_gated_aon \
+-applies_to outputs \
+-rule high_to_low \
+-location self
+
+# Retention strategy
+set_retention pgd_retain \
+-domain pd_gated \
+-retention_power_net VCCL \
+-retention_ground_net GND \
+-elements {pgd_wrapper/regA}
+
+set_retention_control pgd_retain \
+-domain pd_gated \
+-save_signal {aon_wrapper/pmu/ret_en high} \
+-restore_signal {aon_wrapper/pmu/ret_en low}
+
+# Create Power State Table
+add_port_state VDDH \
+-state {HighVoltage 1.1}
+add_port_state VDDL \
+-state {LowVoltage 0.9}
+add_port_state sw_aon_pgd_wrapper/sw_VCCH_gated \
+-state {HighVoltage 1.1} \
+-state {aonpgd_off off}
+add_port_state sw_pgd_wrapper/sw_VCCL_gated \
+-state {LowVoltage 0.9} \
+-state {pgd_off off}
+
+create_pst pwr_state_table \
+-supplies {VCCH VCCL VDDH_gated VDDL_gated}
+
+add_pst_state PRE_BOOT \
+-pst pwr_state_table \
+-state { HighVoltage LowVoltage aonpgd_off pgd_off}
+add_pst_state AONPGD_ON \
+-pst pwr_state_table \
+-state { HighVoltage LowVoltage HighVoltage pgd_off}
+add_pst_state PGD_ON \
+-pst pwr_state_table \
+-state { HighVoltage LowVoltage aonpgd_off LowVoltage}
+add_pst_state ALL_ON \
+-pst pwr_state_table \
+-state { HighVoltage LowVoltage HighVoltage LowVoltage}

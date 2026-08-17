@@ -7,6 +7,7 @@ Exit 0 = all steps PASS. Prints a per-step report.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -125,7 +126,8 @@ STEPS = []
 
 def step(name, ok, detail=""):
     STEPS.append((name, bool(ok), detail))
-    print(f"[{'PASS' if ok else 'FAIL'}] {name} {detail}")
+    safe = str(detail).encode("ascii", "replace").decode("ascii")
+    print(f"[{'PASS' if ok else 'FAIL'}] {name} {safe}")
 
 
 def main():
@@ -150,10 +152,32 @@ def main():
         .map(e => e.textContent).join('|')""")
     step("nav has WORKSPACE group", "WORKSPACE" in (nav_labels or ""), nav_labels or "")
     step("no 'More tools' in nav", "More tools" not in (nav_labels or ""))
+    # Top bar is clean: only Home (no dead command-bar menus).
+    cmdbtns = cdp.js("""[...document.querySelectorAll('.cmdbar .cmd-btn')]
+        .map(b => b.textContent.trim()).join('|')""")
+    legacy = re.sub(r"[^a-z ]", "", (cmdbtns or "").lower())
+    step("command bar has no legacy menus",
+         legacy in ("", "home") and all(k not in legacy for k in ["session", "import", "quick", "settings"]),
+         cmdbtns or "clean")
+    step("command bar has Home button", legacy == "home", cmdbtns or "clean")
     hero_btns = cdp.js("""[...document.querySelectorAll('.hero-actions button')]
         .map(b => b.textContent.trim()).join(' | ')""")
     step("hero has 3 primary actions", "Test Drive" in hero_btns and "Validate" in hero_btns and "CI Gate" in hero_btns,
          hero_btns)
+    wf = cdp.js("document.querySelector('#main .wf-strip') ? document.querySelector('#main .wf-strip').textContent : ''")
+    step("home workflow strip renders", bool(wf) and all(k in (wf or "") for k in ["BUILD", "CHECK", "UNDERSTAND", "COMPARE", "GATE", "EXPORT"]), wf or "")
+
+    # Every analysis feature is standalone: clicking it directly renders its
+    # own UPF input + Analyze (no dead "run a validation first" wall). Runs
+    # before any analysis exists.
+    cdp.js("location.hash = '#/pst'")
+    step("power states standalone panel", cdp.wait(
+        "!!document.getElementById('sa-upf') && !!document.getElementById('sa-analyze') && !!document.getElementById('sa-sample')"))
+    cdp.js("document.getElementById('sa-sample').click()")
+    time.sleep(0.4)
+    cdp.js("document.getElementById('sa-analyze').click()")
+    step("standalone analyze lands on same page with real results", cdp.wait(
+        "(() => { const m = document.querySelector('#main'); return m && (m.textContent || '').includes('PST states'); })()", timeout=20))
 
     # 2. Diff page — real samples + compare
     cdp.js("location.hash = '#/diff'")
@@ -199,6 +223,7 @@ def main():
     # 5. Test Drive — full regression workflow
     cdp.js("location.hash = '#/test_drive'")
     step("test drive renders", cdp.wait("!!document.querySelector('#td-run')"))
+    step("test drive has download results", cdp.js("!!document.querySelector('#td-dl')"))
     cdp.js("""document.querySelector('#td-sample').value = 'regression'""")
     cdp.js("document.querySelector('#td-run').click()")
     step("regression workflow result", cdp.wait(
@@ -216,11 +241,25 @@ def main():
         .map(e => e.textContent).join('|')""")
     step("RESULTS group visible after analysis", "RESULTS" in (nav2 or ""), nav2 or "")
 
-    # 7. Every workspace page renders: no error block, no dead buttons.
+    # 7. Domain Relations page - the signature matrix view, driven by the
+    #    analysis loaded from the Test Drive regression step above.
+    cdp.js("location.hash = '#/relations'")
+    step("relations page renders", cdp.wait(
+        "(() => { const m = document.querySelector('#main'); return m && (m.textContent || '').includes('Power Domain Relation Matrix'); })()"))
+    step("relations matrix cells present", (cdp.js(
+        "document.querySelectorAll('td[data-rel-cell]').length") or 0) >= 4)
+    step("relations supply network separate", cdp.js(
+        "(() => { const m = document.querySelector('#main'); const t = m ? m.textContent : ''; return t.includes('Supply network') && t.includes('a shared net is not a domain interaction'); })()"))
+    step("relations topology present", cdp.js(
+        "(() => { const m = document.querySelector('#main'); const t = m ? m.textContent : ''; return t.includes('Power topology') && t.includes('ALWAYS-ON ANCHORS'); })()"))
+    step("relations disclosure present", cdp.js(
+        "(() => { const m = document.querySelector('#main'); const t = m ? m.textContent : ''; return t.includes('Matrix semantics') && t.includes('never invented by the UI'); })()"))
+
+    # 8. Every workspace page renders: no error block, no dead buttons.
     #    WORKSPACE pages first, then the RESULTS pages (analysis is loaded
     #    from the Test Drive regression step above).
     for view in ["validator", "generator", "rules", "trust", "documentation",
-                 "overview", "supply", "pst", "strategies", "design",
+                 "relations", "overview", "supply", "pst", "strategies", "design",
                  "coverage", "readiness", "support", "export"]:
         cdp.js(f"location.hash = '#/{view}'")
         ok_render = cdp.wait(f"""(() => {{
@@ -234,18 +273,53 @@ def main():
         title = cdp.js("document.querySelector('#main .page-title') ? document.querySelector('#main .page-title').textContent : '?'")
         step(f"page renders: {view}", ok_render, f"[{title}] buttons={buttons} nav-links={links}")
 
-    # Generator actually generates through the real backend.
+    # Validator has its own file-upload surface (standalone tool input).
+    cdp.js("location.hash = '#/validator'")
+    step("validator has upload + sample + analyze", cdp.wait(
+        "!!document.querySelector('#val-pick') && !!document.querySelector('#val-load-sample') && !!document.querySelector('#val-analyze')"))
+
+    # Generator actually generates through the real backend (SDC-generator
+    # style layout: labeled params in an input-surface + Generate + output).
     cdp.js("location.hash = '#/generator'")
     cdp.wait("!!document.querySelector('#g-gen')")
+    step("generator layout is input-surface + labeled params", cdp.js(
+        "!!document.querySelector('#main .input-surface') && !!document.querySelector('#g-top') && !!document.querySelector('#g-aon') && document.querySelectorAll('#main .gen-add').length >= 7"))
     cdp.js("document.querySelector('#g-gen').click()")
     step("generator produces output", cdp.wait(
         "(document.querySelector('#g-out') ? document.querySelector('#g-out').textContent.length : 0) > 200",
         timeout=10))
+    # Add/remove a row still works (standalone row editors).
+    cdp.js("document.querySelector('.gen-add[data-group=domains]').click()")
+    step("generator add-row works", cdp.js(
+        "document.querySelectorAll('.gen-rows[data-group=domains] .gen-param-row').length >= 4"))
+    # Command palette: hidden by default (regression: [hidden] must not be
+    # overridden by the .palette display rule), then Ctrl+K opens it.
+    step("palette hidden by default", cdp.js(
+        "getComputedStyle(document.querySelector('#palette')).display === 'none'"))
+    cdp.js("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'k', ctrlKey: true}))")
+    step("command palette opens via Ctrl+K", cdp.wait(
+        "!document.querySelector('#palette').hidden"))
+    cdp.js("document.querySelector('#palette-input').value = 'gate'; document.querySelector('#palette-input').dispatchEvent(new Event('input'))")
+    step("palette filters commands", cdp.wait(
+        "document.querySelectorAll('#palette-list [data-palette-i]').length >= 1 && document.querySelector('#palette-list').textContent.includes('CI Gate')"))
+    cdp.js("document.querySelector('#palette-list [data-palette-i]').click()")
+    step("palette command navigates to gate", cdp.wait(
+        "location.hash.includes('gate') && document.querySelector('#palette').hidden"))
 
     # Rules page shows the real registry count.
     cdp.js("location.hash = '#/rules'")
-    cdp.wait("!!document.querySelector('.rule-row')")
-    rc = cdp.js("document.querySelectorAll('.rule-row').length")
+    cdp.wait("!!document.querySelector('.rule-card')")
+    rc = cdp.js("document.querySelectorAll('.rule-card').length")
+    step("rules has search + layer + severity + stat cards", cdp.js(
+        "!!document.getElementById('rule-q') && !!document.getElementById('rule-layer') && document.querySelectorAll('.stat-card').length === 4"))
+    step("rules has download JSON + Markdown", cdp.js(
+        "!!document.getElementById('rules-dl-json') && !!document.getElementById('rules-dl-md')"))
+    step("rules search filters to real subset", cdp.js(
+        "(() => { const i = document.getElementById('rule-q'); if (!i) return false; i.value='retention'; i.dispatchEvent(new Event('input')); return true; })()") and cdp.wait(
+        "document.querySelectorAll('.rule-card').length > 0 && document.querySelectorAll('.rule-card').length < 65", timeout=8))
+    step("no em-dash in rendered rules text", not (cdp.js(
+        "(document.querySelector('#main').textContent || '').includes('\u2014')")))
+    cdp.js("document.getElementById('rule-q').value=''; document.getElementById('rule-q').dispatchEvent(new Event('input'));")
     step("rules registry renders", (rc or 0) >= 60, f"{rc} rule rows")
 
     # Trust + Documentation disclose real content.

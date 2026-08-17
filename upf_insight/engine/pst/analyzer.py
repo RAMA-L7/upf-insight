@@ -72,7 +72,7 @@ def analyze_pst(model: PowerIntentModel) -> PstAnalysis:
     analysis.cross_state_events = analyze_cross_state(model)
 
     if not pst.states:
-        analysis.coverage_note = "PST exists but has zero states — no legal power combination declared."
+        analysis.coverage_note = "PST exists but has zero states - no legal power combination declared."
     elif analysis.undeclared_states:
         analysis.coverage_note = (
             f"PST references {len(analysis.undeclared_states)} undeclared state(s)."

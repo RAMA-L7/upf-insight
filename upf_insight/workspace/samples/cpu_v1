@@ -1,4 +1,4 @@
-# cpu_subsys_v1.upf — realistic CPU-subsystem power intent (known-good).
+# cpu_subsys_v1.upf - realistic CPU-subsystem power intent (known-good).
 #
 # A believable block-level low-power design:
 #   - CPU core domain (switchable, 1.0 V via power switch)

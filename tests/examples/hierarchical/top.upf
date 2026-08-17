@@ -1,0 +1,41 @@
+# Top-level UPF - owns PD_AON, composes children via load_upf + supply maps
+upf_version 3.0
+set_design_top top
+
+create_power_domain PD_AON -elements {u_aon}
+set_port_attributes PD_AON -attribute {always_on true}
+
+create_supply_port vdd_aon -direction in
+create_supply_net vdd_aon -resolve port
+connect_supply_net vdd_aon -ports vdd_aon
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+set_domain_supply_net PD_AON -primary_power_net vdd_aon -primary_ground_net vss
+
+# Hierarchical composition: each child UPF is loaded under its own scope and
+# maps its local supply (vdd_aon, vss) onto the same-named top-level supply.
+# load_upf runs in the top scope; -scope scopes the child and -supply pairs
+# resolve against this (parent) scope.
+load_upf core_a.upf -scope core_a -supply {vdd_aon vdd_aon} -supply {vss vss}
+
+load_upf core_b.upf -scope core_b -supply {vdd_aon vdd_aon} -supply {vss vss}
+
+load_upf sram.upf -scope sram -supply {vdd_aon vdd_aon} -supply {vss vss}
+
+# -- Power states / PST ---------------------------------------------------------
+# Child-scoped switched nets are referenced by their full scope path so the
+# PST row references resolve to the definitions inside core_a/core_b.
+add_port_state vdd_aon -state {ON 1.0}
+add_port_state vss -state {ON 0.0}
+add_port_state core_a/vdd_a_sw -state {ON 1.0} -state {OFF 0.0}
+add_port_state core_b/vdd_b_sw -state {ON 1.0} -state {OFF 0.0}
+
+create_pst pst_top -supplies {vdd_aon vss core_a/vdd_a_sw core_b/vdd_b_sw}
+add_pst_state ALL_ON -pst pst_top \
+  -state {vdd_aon ON vss ON core_a/vdd_a_sw ON core_b/vdd_b_sw ON}
+add_pst_state A_OFF -pst pst_top \
+  -state {vdd_aon ON vss ON core_a/vdd_a_sw OFF core_b/vdd_b_sw ON}
+add_pst_state B_OFF -pst pst_top \
+  -state {vdd_aon ON vss ON core_a/vdd_a_sw ON core_b/vdd_b_sw OFF}

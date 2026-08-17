@@ -1,6 +1,6 @@
 """Web API regression tests for the analysis workflow endpoints.
 
-Covers /api/diff, /api/gate, /api/report and /api/sample — each must return
+Covers /api/diff, /api/gate, /api/report and /api/sample - each must return
 REAL engine evidence (never fake results) and honest error states.
 """
 

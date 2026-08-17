@@ -1,4 +1,4 @@
-"""Power-intent coverage analysis — structural domain/supply coverage."""
+"""Power-intent coverage analysis - structural domain/supply coverage."""
 
 from .coverage import CoverageResult, DomainCoverage, analyze_coverage
 

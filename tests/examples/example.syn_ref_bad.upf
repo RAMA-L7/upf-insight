@@ -1,4 +1,4 @@
-# example.syn_ref_bad.upf — golden fixture exercising syntax + reference-layer rules.
+# example.syn_ref_bad.upf - golden fixture exercising syntax + reference-layer rules.
 upf_version 9.9
 set_design_top syn_top
 

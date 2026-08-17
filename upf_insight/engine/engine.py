@@ -31,6 +31,7 @@ class ValidateResult:
     pst: Optional[PstAnalysis] = None
     readiness: Optional[ReadinessResult] = None
     coverage: Optional[CoverageResult] = None
+    relations: Optional[object] = None  # DomainRelations (derived, canonical)
     file_count: int = 0
     command_count: int = 0
 
@@ -40,12 +41,16 @@ class ValidateResult:
 
     def to_dict(self) -> dict:
         model = self.check.model.to_dict() if self.check.model else None
+        rel = None
+        if self.relations is not None:
+            rel = self.relations.to_dict() if hasattr(self.relations, "to_dict") else self.relations
         return {
             "check": self.check.to_dict(),
             "support": self.support.to_dict() if self.support else None,
             "pst": self.pst.to_dict() if self.pst else None,
             "readiness": self.readiness.to_dict() if self.readiness else None,
             "coverage": self.coverage.to_dict() if self.coverage else None,
+            "relations": rel,
             "model": model,
             "file_count": self.file_count,
             "command_count": self.command_count,
@@ -68,12 +73,16 @@ def _run(records: List[CommandRecord], paths: List[str],
     pst: PstAnalysis = analyze_pst(model)
     readiness: ReadinessResult = compute_readiness(model, check)
     coverage: CoverageResult = analyze_coverage(model)
+    from ..model.relations import derive_domain_relations
+
+    relations = derive_domain_relations(model)
     return ValidateResult(
         check=check,
         support=support,
         pst=pst,
         readiness=readiness,
         coverage=coverage,
+        relations=relations,
         file_count=len(paths),
         command_count=model.commands_seen,
     )
@@ -109,7 +118,7 @@ def validate_records(records: List[CommandRecord],
             result.check.model.design = design
             result.check = check_model(result.check.model, rules=rules)
             # Design context changes the support boundary and the DESIGN_CONTEXT
-            # readiness dimension — recompute both so the web UI is honest.
+            # readiness dimension - recompute both so the web UI is honest.
             result.support = compute_support_boundary(result.check.model)
             result.readiness = compute_readiness(result.check.model, result.check)
     return result

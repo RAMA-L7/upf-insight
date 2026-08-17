@@ -79,6 +79,13 @@ def _parser() -> argparse.ArgumentParser:
     gn = sub.add_parser("generate", help="generate standard UPF power-intent constructs")
     gn.add_argument("--domains", default="core,io,sram",
                     help="comma-separated domain names")
+    gn.add_argument("--domain-type", action="append", default=[],
+                    metavar="NAME:TYPE",
+                    help="domain power type (NAME:always_on|switchable) - "
+                         "repeatable; absent means UNKNOWN (evidence-based)")
+    gn.add_argument("--domain-power", action="append", default=[],
+                    metavar="NAME:POWER[:GROUND]",
+                    help="per-domain primary power net (repeatable)")
     gn.add_argument("--always-on", default="clk,rst",
                     help="comma-separated always-on signals")
     gn.add_argument("--retention", default="",
@@ -93,8 +100,21 @@ def _parser() -> argparse.ArgumentParser:
     gn.add_argument("--level-shifter", action="append", default=[],
                     metavar="DOMAIN[:LOC[:THRESHOLD]]",
                     help="add a level shifter (repeatable)")
+    gn.add_argument("--relation", action="append", default=[],
+                    metavar="FROM:TO[:KINDS]",
+                    help="add a domain relation (repeatable; KINDS comma-separated, default isolation)")
+    gn.add_argument("--architecture", choices=["flat", "hierarchical"],
+                    default="flat", help="generation architecture")
+    gn.add_argument("--hierarchy", default="",
+                    help="comma-separated child scopes for hierarchical mode")
     gn.add_argument("-o", "--output", metavar="UPF",
                     help="write the generated UPF to a file (default stdout)")
+
+    rel = sub.add_parser("relations",
+                         help="show the power-domain relation graph (matrix, types, evidence)")
+    rel.add_argument("files", nargs="+")
+    rel.add_argument("--json", action="store_true",
+                     help="emit machine-readable relation JSON")
 
     rl = sub.add_parser("rules", help="inspect the rule registry")
     rl_sub = rl.add_subparsers(dest="rules_cmd")
@@ -244,13 +264,36 @@ def _run_generate(args) -> int:
         IsolationParam,
         LevelShifterParam,
         RetentionParam,
+        RelationParam,
         generate_upf,
+        generate_project,
     )
 
     domains = [d.strip() for d in args.domains.split(",") if d.strip()]
+    types = {}
+    for spec in args.domain_type:
+        parts = [s.strip() for s in spec.split(":")]
+        if len(parts) != 2 or parts[1] not in ("always_on", "switchable"):
+            print(f"invalid --domain-type (need NAME:always_on|switchable): "
+                  f"{spec}", file=sys.stderr)
+            return 2
+        types[parts[0]] = parts[1]
+    powers = {}
+    for spec in args.domain_power:
+        parts = [s.strip() for s in spec.split(":")]
+        if len(parts) < 2 or not parts[0]:
+            print(f"invalid --domain-power (need NAME:POWER[:GROUND]): {spec}",
+                  file=sys.stderr)
+            return 2
+        powers[parts[0]] = (parts[1], parts[2] if len(parts) > 2 else "")
     params = UPFParams(
         design_top=args.design_top,
-        domains=[DomainParam(d) for d in domains],
+        domains=[
+            DomainParam(d, domain_type=types.get(d, ""),
+                        primary_power=powers.get(d, ("", ""))[0],
+                        primary_ground=powers.get(d, ("", ""))[1])
+            for d in domains
+        ],
         always_on=[s.strip() for s in args.always_on.split(",") if s.strip()],
         retention=[RetentionParam(d) for d in args.retention.split(",") if d.strip()],
     )
@@ -288,7 +331,33 @@ def _run_generate(args) -> int:
             ls.threshold = parts[2]
         params.level_shifters.append(ls)
 
+    params.architecture = args.architecture
+    params.hierarchy = [s.strip() for s in args.hierarchy.split(",") if s.strip()]
+    for spec in args.relation:
+        parts = [s.strip() for s in spec.split(":")]
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            print(f"invalid --relation spec (need FROM:TO[:KINDS]): {spec}",
+                  file=sys.stderr)
+            return 2
+        kinds = parts[2] if len(parts) > 2 and parts[2] else "isolation"
+        params.relations.append(RelationParam(parts[0], parts[1], kinds))
     try:
+        if params.architecture == "hierarchical":
+            project = generate_project(params)
+            if args.output:
+                out_dir = args.output.rstrip("/")
+                import os
+
+                os.makedirs(out_dir, exist_ok=True)
+                for name, text in sorted(project.items()):
+                    with open(os.path.join(out_dir, name), "w",
+                              encoding="utf-8", newline="\n") as fh:
+                        fh.write(text)
+                print(f"wrote {len(project)} file(s) to {out_dir}/")
+                return 0
+            for name, text in sorted(project.items()):
+                sys.stdout.write(f"# ==== {name} ====\n{text}")
+            return 0
         text = generate_upf(params)
     except ValueError as exc:
         print(f"generate: {exc}", file=sys.stderr)
@@ -298,6 +367,54 @@ def _run_generate(args) -> int:
             fh.write(text)
     else:
         sys.stdout.write(text)
+    return 0
+
+
+def _run_relations(args) -> int:
+    result = validate(args.files)
+    rel = result.relations
+    if rel is None:
+        sys.stdout.write("No relation data available.\n")
+        return 0
+    if args.json:
+        sys.stdout.write(json.dumps(rel.to_dict(), indent=2, default=str) + "\n")
+        return 0
+    lines = [
+        "UPF-INSIGHT - power-domain relations",
+        "====================================",
+        f"Architecture : {rel.architecture}",
+        f"Domains      : {len(rel.domains)}",
+        f"Always-On    : {sum(1 for d in rel.domains if d.type == 'ALWAYS_ON')}",
+        f"Switchable   : {sum(1 for d in rel.domains if d.type == 'SWITCHABLE')}",
+        f"UPF files    : {len(rel.files)}",
+        "",
+        "DOMAIN RELATIONS",
+        "-----------------",
+    ]
+    if not rel.relations:
+        lines.append("(no domain relations detected)")
+    for r in rel.relations:
+        line = f"{r.from_domain} -> {r.to_domain}     {r.label}"
+        ev = r.evidence[0] if r.evidence else None
+        if ev is not None:
+            loc = f" (L{ev.line})" if ev.line else ""
+            line += f"   [{ev.kind}{loc}]"
+        lines.append(line)
+    lines.append("")
+    lines.append("MATRIX")
+    names = [d.name for d in rel.domains]
+    header = "        " + "".join(f"{n[:10]:>11}" for n in names)
+    lines.append(header)
+    for f in names:
+        row = f"{f[:10]:>8}" + "".join(
+            f"{rel.matrix.get(f, {}).get(t, '-'):>11}" for t in names)
+        lines.append(row)
+    lines.append("")
+    lines.append("DOMAINS")
+    for d in rel.domains:
+        lines.append(f"  {d.name:12} {d.type:10} power={d.primary_power or '-'} "
+                     f"related={', '.join(sorted(d.related)) or '-'}")
+    sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
 
@@ -326,6 +443,7 @@ def main(argv: List[str] | None = None) -> int:
         "model": _run_model,
         "pst": _run_pst,
         "coverage": _run_coverage,
+        "relations": _run_relations,
         "report": _run_report,
         "diff": _run_diff,
         "generate": _run_generate,
@@ -343,7 +461,7 @@ def main(argv: List[str] | None = None) -> int:
     except ValueError as exc:
         sys.stderr.write(f"upf-insight: invalid input: {exc}\n")
         return 2
-    except Exception as exc:  # noqa: BLE001 — engine failure must be loud
+    except Exception as exc:  # noqa: BLE001 - engine failure must be loud
         sys.stderr.write(f"upf-insight: engine failure: {exc}\n")
         return 3
 

@@ -1,4 +1,4 @@
-"""UPF rules registry — the canonical list of UPF-Insight rule codes.
+"""UPF rules registry - the canonical list of UPF-Insight rule codes.
 
 Mirrors the sdc-tools `rules_registry.py`: a single source of truth for every
 rule code, its severity, layer, and description. The registry is the contract
@@ -20,7 +20,7 @@ class Rule:
 
 
 RULES: list[Rule] = [
-    # Layer 1 — Syntax & version
+    # Layer 1 - Syntax & version
     Rule("UPF-001", "error", "SYNTAX", "Unknown UPF command",
          "The leading command name is not a known UPF command."),
     Rule("UPF-002", "error", "SYNTAX", "Illegal option",
@@ -34,7 +34,7 @@ RULES: list[Rule] = [
     Rule("UPF-006", "error", "SYNTAX", "Malformed Tcl",
          "Unbalanced braces/brackets or unterminated continuation."),
 
-    # Layer 2 — Reference integrity
+    # Layer 2 - Reference integrity
     Rule("UPF-010", "error", "REFERENCE", "Undefined supply reference",
          "A supply net/port/set is referenced before it is defined."),
     Rule("UPF-011", "error", "REFERENCE", "Undefined power domain",
@@ -50,7 +50,7 @@ RULES: list[Rule] = [
     Rule("UPF-016", "warning", "REFERENCE", "Invalid set_scope target",
          "set_scope names a module/instance that does not exist."),
 
-    # Layer 3 — Supply & domain integrity
+    # Layer 3 - Supply & domain integrity
     Rule("UPF-020", "error", "SUPPLY_DOMAIN", "Domain missing primary supply",
          "A power domain has no set_domain_supply_net / -primary_supply_set."),
     Rule("UPF-021", "error", "SUPPLY_DOMAIN", "Domain element overlap",
@@ -64,7 +64,7 @@ RULES: list[Rule] = [
     Rule("UPF-025", "info", "SUPPLY_DOMAIN", "Unused supply state",
          "A supply state/voltage is declared but never referenced."),
 
-    # Layer 4 — Power state table
+    # Layer 4 - Power state table
     Rule("UPF-030", "error", "PST", "Declared state never used in PST",
          "add_port_state/add_power_state declares a state never used by the PST."),
     Rule("UPF-031", "error", "PST", "PST references undeclared state",
@@ -84,7 +84,7 @@ RULES: list[Rule] = [
     Rule("UPF-038", "warning", "PST", "Switchable net not modeled by PST",
          "A power-switch output supplying a domain never appears in the PST; tri-state/floating behavior is unverifiable."),
 
-    # Layer 5 — Strategy lint
+    # Layer 5 - Strategy lint
     Rule("UPF-040", "error", "STRATEGY", "Isolation on non-always-on supply",
          "Isolation cell uses a switchable (non-always-on) supply."),
     Rule("UPF-041", "error", "STRATEGY", "Isolation self-located in switchable domain",
@@ -136,7 +136,7 @@ RULES: list[Rule] = [
     Rule("UPF-074", "warning", "STRATEGY", "Switch state condition without control",
          "A power-switch on/off state condition must reference the control port."),
 
-    # Layer 6 — Design-aware (v2; requires netlist/RTL context)
+    # Layer 6 - Design-aware (v2; requires netlist/RTL context)
     Rule("UPF-080", "warning", "DESIGN", "Unknown -elements instance",
          "An instance in -elements does not exist in the netlist."),
     Rule("UPF-081", "warning", "DESIGN", "Unknown control signal",
@@ -172,6 +172,13 @@ RULES: list[Rule] = [
     # Supply equivalence / library mapping
     Rule("UPF-098", "error", "REFERENCE", "Equivalent supply undefined",
          "set_equivalent names a supply that is not declared as net/port/set."),
+
+    # Hierarchical supply mapping / load_upf provenance
+    Rule("UPF-099", "error", "REFERENCE", "Supply map reference undefined",
+         "load_upf -supply maps a local supply to a parent supply; both sides "
+         "must resolve to declared supplies."),
+    Rule("UPF-100", "warning", "DESIGN", "Loaded UPF file missing",
+         "load_upf names a child UPF file that does not exist in the workspace."),
 ]
 
 

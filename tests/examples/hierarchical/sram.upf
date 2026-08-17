@@ -1,0 +1,18 @@
+# Child UPF for sram - owns PD_SRAM (always-on) in scope sram
+upf_version 3.0
+set_scope sram
+
+create_power_domain PD_SRAM -elements {sram}
+set_port_attributes PD_SRAM -attribute {always_on true}
+
+create_supply_port vdd_aon -direction in
+create_supply_net vdd_aon -resolve port
+connect_supply_net vdd_aon -ports vdd_aon
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+set_domain_supply_net PD_SRAM -primary_power_net vdd_aon -primary_ground_net vss
+
+set_isolation iso_SRAM -domain PD_SRAM -isolation_supply vdd_aon -clamp_value 1 \
+  -isolation_signal iso_sram_en -location parent

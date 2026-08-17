@@ -1,4 +1,4 @@
-"""Power-intent model — the in-memory object graph built from UPF commands.
+"""Power-intent model - the in-memory object graph built from UPF commands.
 
 UPF is hierarchical and stateful, so validation runs against a model rather
 than against raw text. This module defines the core entities:
@@ -26,6 +26,7 @@ class PowerDomain:
     elements: List[str] = field(default_factory=list)
     primary_supply_sets: Dict[str, str] = field(default_factory=dict)
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -34,6 +35,7 @@ class SupplyPort:
     scope: str
     direction: str = "inout"  # in | out | inout
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -42,6 +44,7 @@ class SupplyNet:
     scope: str
     connected_to: List[str] = field(default_factory=list)  # resolve_net identifiers
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -50,6 +53,7 @@ class SupplySet:
     scope: str
     functions: Dict[str, str] = field(default_factory=dict)  # power/ground -> supply
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -65,6 +69,7 @@ class PowerSwitch:
     on_state_condition: List[str] = field(default_factory=list)
     off_state_condition: List[str] = field(default_factory=list)
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -126,6 +131,8 @@ class IsolationStrategy:
     control_condition: Optional[str] = None    # from set_isolation_control -isolation_condition
     applies_to: str = "outputs"  # outputs | inputs | internal | inout | outputs,inputs
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
+    scope: str = "."
 
 
 @dataclass
@@ -138,6 +145,8 @@ class LevelShifterStrategy:
     applies_to: str = ""      # inputs | outputs | internal | inout (empty = unspecified)
     control_signal: Optional[str] = None  # from set_level_shifter_control
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
+    scope: str = "."
 
 
 @dataclass
@@ -149,6 +158,8 @@ class RetentionStrategy:
     restore_signal: Optional[str] = None
     control_signal: Optional[str] = None  # from set_retention_control -retention_signal
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
+    scope: str = "."
 
 
 @dataclass
@@ -171,6 +182,7 @@ class RepeaterStrategy:
     isolation_supply: Optional[str] = None  # -repeater_isolation_supply
     control_signal: Optional[str] = None    # from set_repeater_control
     declared_line: Optional[int] = None
+    declared_file: Optional[str] = None
 
 
 @dataclass
@@ -197,6 +209,8 @@ class PowerIntentModel:
     retention_controls: Dict[str, dict] = field(default_factory=dict)
     level_shifter_controls: Dict[str, dict] = field(default_factory=dict)
     repeater_controls: Dict[str, dict] = field(default_factory=dict)
+    #: supply maps declared by load_upf -supply (local supply -> parent supply)
+    supply_maps: List[dict] = field(default_factory=list)
     #: hierarchical UPF events (promote/demote) and nested loads
     hierarchy_events: List[dict] = field(default_factory=list)
     load_upf_events: List[dict] = field(default_factory=list)
@@ -208,6 +222,8 @@ class PowerIntentModel:
     #: Built from the authoritative CommandRecord stream so findings can carry
     #: file provenance without each model object retaining it.
     record_files: Dict[int, List[str]] = field(default_factory=dict)
+    #: basenames of every validated input file (for load_upf resolution)
+    record_file_names: set = field(default_factory=set)
     unsupported_commands: List[str] = field(default_factory=list)
     # --- Syntax & reference layer bookkeeping (populated by the builder) ---
     syntax_issues: List[dict] = field(default_factory=list)      # {rule, message, line, support}
@@ -248,6 +264,7 @@ class PowerIntentModel:
             "repeater_controls": self.repeater_controls,
             "hierarchy_events": self.hierarchy_events,
             "load_upf_events": self.load_upf_events,
+            "supply_maps": self.supply_maps,
             "equivalences": self.equivalences,
             "library_mappings": self.library_mappings,
             "commands_seen": self.commands_seen,

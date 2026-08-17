@@ -2,7 +2,7 @@
 
 The engine knows the source filename for every command line (CommandRecord),
 so findings carrying a ``line`` must resolve their ``file``. Ambiguous lines
-(the same line number in multiple files) must stay empty — never invented.
+(the same line number in multiple files) must stay empty - never invented.
 """
 
 from upf_insight.preprocess.upf_preprocess import preprocess
@@ -47,7 +47,7 @@ def test_clean_file_no_findings():
 
 def test_multi_file_distinct_lines_resolve_each_file():
     # Both files are broken, but B is padded so its content lines (11-13) do
-    # not collide with A's (1-3) — each finding must resolve to its own file.
+    # not collide with A's (1-3) - each finding must resolve to its own file.
     recs = preprocess(BAD, file="a.upf") + preprocess("\n" * 10 + BAD, file="b.upf")
     res = validate_records(recs)
     a_lines = {f.line for f in res.check.findings if f.file == "a.upf"}
@@ -58,7 +58,7 @@ def test_multi_file_distinct_lines_resolve_each_file():
 
 
 def test_multi_file_colliding_lines_leave_file_empty():
-    # Identical content in two files collides on every line number — the
+    # Identical content in two files collides on every line number - the
     # provenance is ambiguous and must NOT be invented.
     recs = preprocess(BAD, file="x.upf") + preprocess(BAD, file="y.upf")
     res = validate_records(recs)

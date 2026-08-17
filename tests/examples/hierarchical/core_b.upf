@@ -1,0 +1,22 @@
+# Child UPF for core_b - owns PD_B in scope core_b
+upf_version 3.0
+set_scope core_b
+
+create_power_domain PD_B -elements {core_b}
+
+create_supply_port vdd_aon -direction in
+create_supply_net vdd_aon -resolve port
+connect_supply_net vdd_aon -ports vdd_aon
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+create_supply_net vdd_b_sw -resolve net
+connect_supply_net vdd_b_sw -ports vdd_aon
+
+set_domain_supply_net PD_B -primary_power_net vdd_b_sw -primary_ground_net vss
+
+create_power_switch PSW_B -input_supply_port vdd_aon -output_supply_port vdd_b_sw \
+  -control_port b_pwr_en -on_state {on {vdd_aon} {b_pwr_en}} -off_state {off {vdd_aon} {!b_pwr_en}}
+
+set_level_shifter ls_B -domain PD_B -location parent -rule both

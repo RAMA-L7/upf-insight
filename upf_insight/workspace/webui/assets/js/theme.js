@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   UPF-Insight — theme.js
+   UPF-Insight - theme.js
    Escaping + status metadata + design tokens.
    Mirrors the sdc-tools (Ṛta) ui/theme.py contract so the workspace shares the
    same design system. Every user-controlled value is escaped at render time.
@@ -19,7 +19,7 @@ export function escAttr(value) {
   return esc(value);
 }
 
-/* Fallback status metadata — shared vocabulary with Ṛta so the UI is never
+/* Fallback status metadata - shared vocabulary with Ṛta so the UI is never
    empty if /api/design is slow; the API response replaces it when it arrives. */
 const FALLBACK = {
   severity: {
@@ -76,7 +76,7 @@ export function statusMeta(kind, status) {
   const table = STATUS[kind] || {};
   const s = String(status == null ? "" : status).toUpperCase();
   if (table[s]) return table[s];
-  return { label: status == null || status === "" ? "—" : String(status), color: "muted", shape: "square" };
+  return { label: status == null || status === "" ? "-" : String(status), color: "muted", shape: "square" };
 }
 
 export function statusBadge(kind, status) {
@@ -93,7 +93,7 @@ export function severityClass(sev) {
   return COLOR_MAP[(STATUS.severity[sev] || {}).color] || "sev-muted";
 }
 
-/* Tokens (mirror Ṛta COLORS) — set from /api/design when available.
+/* Tokens (mirror Ṛta COLORS) - set from /api/design when available.
    Monochrome ink: pure white canvas, black accent, grey scale. */
 export const TOKENS = {
   colors: {

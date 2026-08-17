@@ -1,4 +1,4 @@
-# example.pst_bad.upf — golden fixture exercising the PST rule family.
+# example.pst_bad.upf - golden fixture exercising the PST rule family.
 upf_version 3.0
 set_design_top pst_top
 

@@ -10,7 +10,7 @@ Coverage is *structural* evidence, distinct from rule findings:
   or PST;
 - strategy coverage: retention domains have retention, etc.
 
-No coverage claim implies correctness — it reports what the intent *touches*.
+No coverage claim implies correctness - it reports what the intent *touches*.
 """
 
 from __future__ import annotations

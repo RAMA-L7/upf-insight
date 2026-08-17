@@ -1,9 +1,9 @@
-# example.ls_clamp_bad.upf — isolation/level-shifter edge-case fixture.
+# example.ls_clamp_bad.upf - isolation/level-shifter edge-case fixture.
 #
-#   * UPF-061 — DLO (vdd, 0.8 V) and DHI (vdd_hv, 1.8 V) differ in voltage but
+#   * UPF-061 - DLO (vdd, 0.8 V) and DHI (vdd_hv, 1.8 V) differ in voltage but
 #     neither declares a level shifter. Voltages are declared via NON-"ON"-named
 #     states ({VDD_LOW 0.8}, {VDD_HV 1.8}) to prove the voltage fallback works.
-#   * UPF-046 (warning) — iso_noclamp has no -clamp_value, so its outputs float
+#   * UPF-046 (warning) - iso_noclamp has no -clamp_value, so its outputs float
 #     while isolation is active.
 upf_version 3.0
 set_design_top ls_top

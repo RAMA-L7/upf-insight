@@ -1,4 +1,4 @@
-"""Declarative CI policy engine — gates over readiness + baseline evidence."""
+"""Declarative CI policy engine - gates over readiness + baseline evidence."""
 
 from .policy_engine import (
     EXIT_PASS,

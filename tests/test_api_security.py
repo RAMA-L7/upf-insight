@@ -1,4 +1,4 @@
-"""API server security tests — path-traversal (LFI) guard on the workspace server."""
+"""API server security tests - path-traversal (LFI) guard on the workspace server."""
 
 import json
 import os

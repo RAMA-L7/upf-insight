@@ -1,0 +1,25 @@
+# Child UPF for core_a - owns PD_A in scope core_a
+upf_version 3.0
+set_scope core_a
+
+create_power_domain PD_A -elements {core_a}
+
+create_supply_port vdd_aon -direction in
+create_supply_net vdd_aon -resolve port
+connect_supply_net vdd_aon -ports vdd_aon
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+create_supply_net vdd_a_sw -resolve net
+connect_supply_net vdd_a_sw -ports vdd_aon
+
+set_domain_supply_net PD_A -primary_power_net vdd_a_sw -primary_ground_net vss
+
+create_power_switch PSW_A -input_supply_port vdd_aon -output_supply_port vdd_a_sw \
+  -control_port a_pwr_en -on_state {on {vdd_aon} {a_pwr_en}} -off_state {off {vdd_aon} {!a_pwr_en}}
+
+set_isolation iso_A -domain PD_A -isolation_supply vdd_aon -clamp_value 1 \
+  -isolation_signal iso_a_en -location parent
+
+set_retention ret_A -domain PD_A -retention_supply vdd_aon -save_signal save_a -restore_signal restore_a

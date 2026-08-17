@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   UPF-Insight — viz.js
+   UPF-Insight - viz.js
    Technical visualizations (mirrors the Ṛta viz.js style):
      - Background canvas (removed for the minimal tool aesthetic)
      - Readiness dimension rail (UPF dimensions)
@@ -12,7 +12,7 @@
 import { esc } from "./theme.js";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   BACKGROUND — intentionally a no-op: the tool uses a plain white paper
+   BACKGROUND - intentionally a no-op: the tool uses a plain white paper
    canvas. Kept as a stub so app.js's initBackground call is a safe no-op.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -23,7 +23,7 @@ export function initBackground(container) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   READINESS RAIL — UPF signature dimension stack
+   READINESS RAIL - UPF signature dimension stack
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function readinessRail(readiness) {
@@ -48,7 +48,7 @@ export function readinessRail(readiness) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SUPPLY COVERAGE STRIPS — bit-level (per domain element set)
+   SUPPLY COVERAGE STRIPS - bit-level (per domain element set)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function supplyStripHtml(name, segments, total) {
@@ -62,7 +62,7 @@ export function supplyStripHtml(name, segments, total) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PST STATE INVENTORY — per supply-state cell
+   PST STATE INVENTORY - per supply-state cell
    ═══════════════════════════════════════════════════════════════════════════ */
 export function pstMatrixHtml(pst) {
   if (!pst || !pst.states) return "";
@@ -76,7 +76,7 @@ export function pstMatrixHtml(pst) {
     h += `<tr><td class="mono">${esc(s.name)}</td>` +
       supplies.map(sup => {
         const v = (s.supply_states || {})[sup];
-        return `<td><span class="ps-cell ${cellCls(v)}">${esc(v || "—")}</span></td>`;
+        return `<td><span class="ps-cell ${cellCls(v)}">${esc(v || "-")}</span></td>`;
       }).join("") + "</tr>";
   });
   h += "</tbody></table></div>";

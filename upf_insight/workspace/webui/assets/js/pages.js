@@ -1,15 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   UPF-Insight — pages.js
+   UPF-Insight - pages.js
    All workspace page renderers. Every page consumes REAL backend evidence
-   through the API — no mock data, no invented counts. All user-controlled
+   through the API - no mock data, no invented counts. All user-controlled
    content is escaped via theme.esc. Mirrors the Ṛta pages.js structure.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { esc, statusBadge, severityClass } from "./theme.js";
 import { pageHead, sectionTitle, metricRow, chips, emptyState, typedError,
          callout, sourceViewer, sourceExcerpt, table, accordion, kvList,
-         segFilter, findingRow, findingDetailHtml } from "./components.js";
+         segFilter, findingRow, escAttr } from "./components.js";
 import { readinessRail, supplyStripHtml, pstMatrixHtml } from "./viz.js";
+import { RULE_FIXES } from "./rule_fixes.js";
 
 export const App = {
   state: {
@@ -110,14 +111,39 @@ function scopeNote(a) {
   return parts.join(" · ");
 }
 
+/* Every feature owns its input surface - standalone first. When no analysis
+   exists yet, the feature page renders its own UPF input + Analyze instead of
+   a dead "run a validation first" wall. The same real engine runs either way. */
+function standaloneAnalyzeHtml(title, note) {
+  return `<div class="input-surface entry">
+    <div class="entry-step">
+      <div class="es-num">1</div>
+      <div class="es-main">
+        <div class="es-head"><span class="es-title">${esc(title)}</span><span class="es-req">UPF</span></div>
+        <p class="es-why">${esc(note)}</p>
+        <div class="es-actions">
+          <button class="btn btn-sm" id="sa-pick" type="button">Choose file…</button>
+          <button class="btn btn-sm btn-ghost" id="sa-sample" type="button">Load sample</button>
+          <button class="btn btn-sm btn-ghost" id="sa-clear" type="button">Clear</button>
+          <span class="is-file mono" id="sa-file">${esc(App.state.filename)}</span>
+        </div>
+        <textarea class="code-input" id="sa-upf" rows="6" spellcheck="false" placeholder="upf_version 3.0&#10;set_design_top top&#10;create_power_domain core -elements {u_core}&#10;...">${esc(App.state.upf)}</textarea>
+      </div>
+    </div>
+    <div class="entry-foot">
+      <button class="btn btn-primary" id="sa-analyze" type="button">Analyze</button>
+      <span class="mono" style="font-size:11px;color:var(--text-muted)">runs locally · deterministic · offline · no LLM</span>
+    </div>
+  </div>`;
+}
+
 /* ── Overview (Summary) ─────────────────────────────────────────────────── */
 export async function pageOverview() {
   const a = App.state.analysis;
   if (!a) {
-    return pageHead("RESULTS", "Summary", "Run an analysis first — the summary is built from real analysis evidence.",
-      "Open New Analysis, load a UPF file, then press Analyze.")
-      + emptyState("No analysis yet", "Run a validation on a UPF file to populate the overview.",
-                   "Open New Analysis, load a UPF file, then press Analyze.");
+    return pageHead("RESULTS", "Summary", "Run this tool on your UPF - the summary is built from real analysis evidence.",
+      "Provide a UPF below and press Analyze - the summary renders here.")
+      + standaloneAnalyzeHtml("Summary", "Drop your IEEE 1801 UPF in here - UPF-Insight analyzes it and renders the executive summary in place.");
   }
   const rdy = a.readiness || {};
   const c = a.check || {};
@@ -126,7 +152,7 @@ export async function pageOverview() {
   const cov = a.coverage || {};
   const blockers = (rdy.blockers || []).slice(0, 8);
 
-  let html = pageHead("RESULTS", "Summary", "The executive view — verdict, trust, power intent, coverage.",
+  let html = pageHead("RESULTS", "Summary", "The executive view - verdict, trust, power intent, coverage.",
                       "Start with the verdict, then open Findings for the detail.");
   html += `<div class="rdy-overall">
     <div><div class="ro-label">Overall readiness</div><div class="ro-value">${statusBadge("readiness", rdy.overall || "INSUFFICIENT_CONTEXT")}</div></div>
@@ -155,28 +181,26 @@ export async function pageOverview() {
   html += `<div class="mono" style="font-size:12px;color:var(--text-secondary)">${scopeNote(a)}</div>`;
 
   if (cov.domain_coverage !== undefined) {
-    html += sectionTitle("Coverage", "what the intent touches — coverage ≠ correctness");
+    html += sectionTitle("Coverage", "what the intent touches - coverage ≠ correctness");
     html += metricRow([
       { label: "Domain coverage", value: Math.round(cov.domain_coverage * 100) + "%" },
       { label: "Supply coverage", value: Math.round(cov.supply_coverage * 100) + "%" },
       { label: "Unreferenced supplies", value: (cov.unreferenced_supplies || []).length },
     ]);
-    html += `<p class="callout co-info" style="margin-top:6px"><span><strong>Coverage is not correctness</strong> — a fully covered design can still have power-intent errors.</span></p>`;
+    html += `<p class="callout co-info" style="margin-top:6px"><span><strong>Coverage is not correctness</strong> - a fully covered design can still have power-intent errors.</span></p>`;
   }
 
-  (rdy.notes || []).forEach(n => html += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">— ${esc(n)}</div>`);
-  html += `<p class="callout co-warning" style="margin-top:16px"><span><strong>READY ≠ signoff</strong> — this is a power-intent review, not a power/IR signoff.</span></p>`;
+  (rdy.notes || []).forEach(n => html += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">- ${esc(n)}</div>`);
+  html += `<p class="callout co-warning" style="margin-top:16px"><span><strong>READY ≠ signoff</strong> - this is a power-intent review, not a power/IR signoff.</span></p>`;
   return html + "</div>";
 }
 
 /* ── Home dashboard (landing) ───────────────────────────────────────────── */
-function capCard(icon, title, desc, meta, view, cta) {
-  return `<div class="cap-card">
+function capCard(icon, title, desc, input, view, cta) {
+  return `<div class="cap-card" tabindex="0" role="button" aria-label="open ${esc(title)}">
     <div class="cap-head"><span class="cap-icon">${icon}</span><span class="cap-title">${esc(title)}</span></div>
     <p class="cap-desc">${esc(desc)}</p>
-    <div class="cap-meta">${meta.map(([k, v]) =>
-      `<div class="cap-kv"><span class="cap-k">${esc(k)}</span><span class="cap-v">${esc(v)}</span></div>`).join("")}
-    </div>
+    <div class="cap-tags">${input ? `<span class="cap-tag mono">${esc(input)}</span>` : `<span class="cap-tag mono">no input required</span>`}</div>
     <div class="cap-cta"><button class="btn" type="button" data-home-view="${esc(view)}">${esc(cta)}<span>→</span></button></div>
   </div>`;
 }
@@ -191,126 +215,98 @@ export async function pageHome() {
   const caps = {
     core: [
       capCard("◈", "UPF Validation",
-       "Check IEEE 1801 power intent across syntax, references, supply/domain, PST, strategy and design-aware layers — every finding traces to a rule and a source line.",
-       [["Input", "UPF (required) · design JSON (optional)"],
-        ["Does", "deterministic 6-layer check"],
-        ["Get", "findings with rule links + source lines"],
-        ["Next", "Findings · Coverage · Health"]],
+       "Check IEEE 1801 power intent across six analysis layers - every finding traces to a rule and a source line.",
+       "UPF required · design JSON optional",
        "validator", "Open Validation"),
       capCard("❐", "UPF Generator",
-       "Build standard IEEE 1801 constructs — power domains, supply switches, isolation, level shifters, retention, repeaters, PST states — into a reviewable UPF file, then validate it in place.",
-       [["Input", "domain / switch / isolation / LS / retention params"],
-        ["Does", "emit IEEE 1801 constructs · inline validate"],
-        ["Get", "UPF text · 0E / 0W confirmation"],
-        ["Next", "Validate generated UPF"]],
+       "Build power domains, switches, isolation, level shifters, retention and PST states - then validate the emitted UPF in place.",
+       "domain / switch / strategy params",
        "generator", "Open Generator"),
     ],
     analyze: [
       capCard("◫", "Power State Intelligence",
-       "Declared supply states, the Power State Table, and cross-state legality — every valid and missing state combination in one matrix.",
-       [["Input", "create_pst · add_pst_state · add_port_state"],
-        ["Does", "build PST matrix · state legality"],
-        ["Get", "state matrix · per-state supplies"],
-        ["Next", "Supply Network"]],
+       "Declared supply states, the Power State Table, and cross-state legality in one matrix.",
+       "create_pst · add_pst_state",
        "pst", "Open Power States"),
       capCard("▤", "Supply Network",
-       "Power domains, supply ports/nets/sets, and power switches behind the intent — the structural supply picture.",
-       [["Input", "create_power_domain · create_supply_* · create_power_switch"],
-        ["Does", "domain + supply + switch inventory"],
-        ["Get", "network tables with scope and functions"],
-        ["Next", "Coverage"]],
+       "Power domains, supply ports/nets/sets, and power switches behind the intent.",
+       "create_power_domain · create_supply_*",
        "supply", "Open Supply Network"),
       capCard("⇄", "Strategies",
-       "Isolation, retention, and level-shifter strategies declared in the intent — location, clamp, control and supply.",
-       [["Input", "set_isolation · set_retention · set_level_shifter"],
-        ["Does", "strategy inventory + conditioning"],
-        ["Get", "strategy tables per strategy kind"],
-        ["Next", "Design Context"]],
+       "Isolation, retention and level-shifter strategies - location, clamp, control and supply.",
+       "set_isolation · set_retention · set_level_shifter",
        "strategies", "Open Strategies"),
+      capCard("◉", "Domain Relations",
+       "The power-domain relation matrix - which domains interact, switch boundaries, level-shift crossings, and the evidence behind each cell.",
+       "full analysis result",
+       "relations", "Open Domain Relations"),
       capCard("▤", "Design Context",
-       "Design-aware layer (UPF-080…084) cross-checks power intent against a netlist snapshot — instances, ports, PG pins, sequential state.",
-       [["Input", "netlist JSON (instances / ports / PG pins)"],
-        ["Does", "netlist cross-checks · UPF-080…084 rules"],
-        ["Get", "netlist-grounded findings"],
-        ["Next", "Findings"]],
+       "Cross-check power intent against a netlist snapshot - instances, ports, PG pins, sequential state.",
+       "netlist JSON optional",
        "design", "Open Design"),
       capCard("▦", "Coverage",
-       "Is every power domain and supply accounted for? Coverage reports what the intent touches — coverage is not correctness.",
-       [["Input", "full analysis result"],
-        ["Does", "domain + supply coverage"],
-        ["Get", "coverage % · gaps · unreferenced supplies"],
-        ["Next", "Health"]],
+       "Is every power domain and supply accounted for? Coverage is not correctness.",
+       "full analysis result",
        "coverage", "Open Coverage"),
       capCard("◫", "Readiness",
-       "Verdict, blockers, review items and advisories across five dimensions — READY is not a power/IR signoff.",
-       [["Input", "full analysis result"],
-        ["Does", "5-dimension readiness with reasons"],
-        ["Get", "verdict · blockers · why"],
-        ["Next", "Support boundary"]],
+       "Verdict, blockers, review items and advisories across five dimensions.",
+       "full analysis result",
        "readiness", "Open Health"),
     ],
     advanced: [
       capCard("⇄", "UPF Diff",
-       "Compare two UPF revisions semantically — domains, supplies, switches, strategies and PST changes — not raw text.",
-       [["Input", "Version A UPF · Version B UPF"],
-        ["Does", "model-level semantic comparison"],
-        ["Get", "ADD / REMOVE / MODIFY changes"],
-        ["Next", "Validate · CI Gate"]],
+       "Compare two UPF revisions semantically - domains, supplies, strategies and PST changes, not raw text.",
+       "Version A UPF · Version B UPF",
        "diff", "Open Diff"),
       capCard("⌦", "CI Gate",
-       "Gate power-intent changes against a policy — PASS/FAIL with reasons and an exit code, exactly as CI would see it.",
-       [["Input", "UPF · policy · optional baseline"],
-        ["Does", "policy evaluation (BLOCKERS_ONLY / NO_READINESS_REGRESSION / STRICT)"],
-        ["Get", "PASS / FAIL · reasons · JSON"],
-        ["Next", "Reports"]],
+       "Gate power-intent changes against a policy - PASS/FAIL with reasons and an exit code, as CI sees it.",
+       "UPF · policy · optional baseline",
        "gate", "Open CI Gate"),
       capCard("▶", "Test Drive",
-       "Run the real workflow on believable samples — clean, buggy, and a V1→V2 regression — validate, diff and gate.",
-       [["Input", "built-in samples (clean / buggy / regression)"],
-        ["Does", "real backend analysis end-to-end"],
-        ["Get", "findings · diff · gate result"],
-        ["Next", "Findings"]],
+       "Run the real workflow on believable samples - clean, buggy, and a V1→V2 regression.",
+       "built-in samples",
        "test_drive", "Start Test Drive"),
     ],
     output: [
       capCard("❐", "Reports",
-       "HTML / JSON / text reports generated from real analysis evidence — findings, rule IDs, lines, readiness and support.",
-       [["Input", "UPF (or current analysis)"],
-        ["Does", "report generation (html / json / text)"],
-        ["Get", "downloadable report with real evidence"],
-        ["Next", "Trust"]],
+       "HTML / JSON / text reports from real analysis evidence - findings, rule IDs, lines, readiness, support.",
+       "UPF or current analysis",
        "reports", "Open Reports"),
       capCard("☰", "Rules",
-       `Browse ${_RULE_COUNT()} deterministic rules across six layers — what each detects, its severity, and why it matters.`,
-       [["Input", "none — reference surface"],
-        ["Does", "rule registry browse"],
-        ["Get", "rule ID · severity · description"],
-        ["Next", "Documentation"]],
+       `Browse ${_RULE_COUNT()} deterministic rules across six layers - what each detects and why it matters.`,
+       "none - reference surface",
        "rules", "Open Rules"),
       capCard("◆", "Trust",
-       "What UPF-Insight validates, partially validates, and never claims — the trust boundary, plainly.",
-       [["Input", "none — disclosure surface"],
-        ["Does", "boundary statements"],
-        ["Get", "trust model + limitations"],
-        ["Next", "Support boundary"]],
+       "What UPF-Insight validates, partially validates, and never claims - the trust boundary, plainly.",
+       "none - disclosure surface",
        "trust", "Open Trust"),
       capCard("❐", "Documentation",
-       "Repository documentation, CLI reference, and the evidence map — the UPF journey from zero to result.",
-       [["Input", "none — reference surface"],
-        ["Does", "link real repository docs"],
-        ["Get", "quick-start + references"],
-        ["Next", "Rules"]],
+       "Repository documentation, CLI reference, and the evidence map - the UPF journey from zero to result.",
+       "none - reference surface",
        "documentation", "Open Documentation"),
     ],
   };
   let html = pageHead("UPF-INSIGHT", "What can I do with UPF-Insight?",
-    "UPF-Insight runs a deterministic, local analysis of IEEE 1801 power intent — validation, PST intelligence, supply/strategy analysis, design-aware cross-checks, semantic diff, a CI gate, and reports.");
+    "UPF-Insight runs a deterministic, local analysis of IEEE 1801 power intent - validation, PST intelligence, supply/strategy analysis, design-aware cross-checks, semantic diff, a CI gate, and reports.");
   html += `<div class="hero">
     <div class="hero-actions">
       <button class="btn btn-primary" type="button" data-home-view="test_drive">Start with Test Drive</button>
       <button class="btn btn-primary" type="button" data-home-view="new_analysis">Validate a UPF</button>
       <button class="btn btn-primary" type="button" data-home-view="gate">Run CI Gate</button>
     </div>
+  </div>`;
+  html += `<div class="wf-strip" role="list" aria-label="primary workflow">
+    <div class="wf-step"><span class="wf-k mono">BUILD</span><button class="btn btn-sm" type="button" data-home-view="generator">Generate UPF</button></div>
+    <span class="wf-arrow">→</span>
+    <div class="wf-step"><span class="wf-k mono">CHECK</span><button class="btn btn-sm" type="button" data-home-view="new_analysis">Validate UPF</button></div>
+    <span class="wf-arrow">→</span>
+    <div class="wf-step"><span class="wf-k mono">UNDERSTAND</span><button class="btn btn-sm" type="button" data-home-view="overview">Findings</button></div>
+    <span class="wf-arrow">→</span>
+    <div class="wf-step"><span class="wf-k mono">COMPARE</span><button class="btn btn-sm" type="button" data-home-view="diff">UPF Diff</button></div>
+    <span class="wf-arrow">→</span>
+    <div class="wf-step"><span class="wf-k mono">GATE</span><button class="btn btn-sm" type="button" data-home-view="gate">CI Gate</button></div>
+    <span class="wf-arrow">→</span>
+    <div class="wf-step"><span class="wf-k mono">EXPORT</span><button class="btn btn-sm" type="button" data-home-view="reports">Reports / JSON</button></div>
   </div>`;
   html += capGroup("CORE", "the daily power-intent tasks", caps.core);
   html += capGroup("ANALYZE", "understand the intent after a validation run", caps.analyze);
@@ -323,9 +319,9 @@ export async function pageHome() {
 export async function pageNewAnalysis() {
   const has = !!App.state.analysis;
   let html = pageHead("UPF-INSIGHT", "Check your power intent before implementation",
-    "Drop in your UPF (IEEE 1801) file — UPF-Insight runs a deterministic check across syntax, references, supply/domain, PST, strategy and design-aware layers.",
-    has ? "Analysis loaded — load a new UPF to re-run, or explore the results."
-        : "The sample is loaded — press Analyze, or load your own UPF.");
+    "Drop in your UPF (IEEE 1801) file - UPF-Insight runs a deterministic check across syntax, references, supply/domain, PST, strategy and design-aware layers.",
+    has ? "Analysis loaded - load a new UPF to re-run, or explore the results."
+        : "The sample is loaded - press Analyze, or load your own UPF.");
   html += `<div class="input-surface entry">
     <div class="entry-step">
       <div class="es-num">1</div>
@@ -344,7 +340,7 @@ export async function pageNewAnalysis() {
       <div class="es-num">2</div>
       <div class="es-main">
         <div class="es-head"><span class="es-title">Design context (netlist JSON)</span><span class="es-opt">OPTIONAL</span></div>
-        <p class="es-why">Optional — UPF-only mode validates syntax, references, supply/domain, PST and strategy layers without design context. Adding a design snapshot unlocks the design-aware layer (UPF-080…084).</p>
+        <p class="es-why">Optional - UPF-only mode validates syntax, references, supply/domain, PST and strategy layers without design context. Adding a design snapshot unlocks the design-aware layer (UPF-080…084).</p>
         <div class="es-actions">
           <button class="btn btn-sm" id="na-net-pick" type="button">Choose file…</button>
           <button class="btn btn-sm btn-ghost" id="na-net-clear" type="button">Clear</button>
@@ -372,6 +368,7 @@ export async function pageValidator() {
     <div class="input-surface-head">
       <span class="is-title">Power-intent input</span>
       <span class="is-file" id="val-file">${esc(App.state.filename)}</span>
+      <button class="btn btn-sm" id="val-pick" type="button">Choose file…</button>
       <button class="btn btn-sm" id="val-load-sample" type="button">Load sample</button>
       <button class="btn btn-sm btn-ghost" id="val-clear" type="button">Clear</button>
     </div>
@@ -400,7 +397,7 @@ export async function pageValidator() {
   const infos = issues.filter(i => i.sev === "info").length;
 
   html += `<div class="mono" style="font-size:12px;color:var(--text-secondary);margin:8px 0">analysis mode: ${esc((a.readiness || {}).mode || "UPF_ONLY")} · ${esc(a.command_count ?? 0)} commands · ${esc(a.file_count ?? 0)} file(s)</div>`;
-  html += chips([statusBadge("trust", trustFromSupport(a.support)), statusBadge("readiness", (a.readiness || {}).overall || "—")]);
+  html += chips([statusBadge("trust", trustFromSupport(a.support)), statusBadge("readiness", (a.readiness || {}).overall || "-")]);
 
   html += metricRow([
     { label: "Errors", value: errs }, { label: "Warnings", value: warns },
@@ -408,8 +405,8 @@ export async function pageValidator() {
   ]);
 
   if (errs) html += callout(`${errs} error(s) must be reviewed before implementation. A clean check is not a power/IR signoff.`, "error");
-  else if (warns) html += callout(`No errors — ${warns} warning(s) need review.`, "warning");
-  else html += callout("No errors or warnings within scope. See the support boundary for what was verified — this is not a power/IR signoff.", "info");
+  else if (warns) html += callout(`No errors - ${warns} warning(s) need review.`, "warning");
+  else html += callout("No errors or warnings within scope. See the support boundary for what was verified - this is not a power/IR signoff.", "info");
 
   html += `<div class="filters">
     <div class="f-field"><label>Severity</label>${segFilter("sev", ["All", "error", "warning", "info"], App.state.filters.sev)}</div>
@@ -427,7 +424,7 @@ export async function pageValidator() {
     return true;
   });
 
-  if (!issues.length) html += emptyState("No issues found", "No findings within the supported analysis scope.", "Review the support boundary — a clean check is not a power/IR signoff.");
+  if (!issues.length) html += emptyState("No issues found", "No findings within the supported analysis scope.", "Review the support boundary - a clean check is not a power/IR signoff.");
   else if (!filtered.length) html += emptyState("No matching findings", "No findings match the current filters.", "Clear or loosen filters to see the full finding list.");
   else {
     html += `<div class="mono" style="font-size:11px;color:var(--text-muted);margin:6px 0">${filtered.length} of ${issues.length} findings shown</div>`;
@@ -442,12 +439,7 @@ export async function pageValidator() {
       ] })),
       { clickable: true }
     );
-    html += `<div style="margin-top:10px">`;
-    html += filtered.slice(0, 12).map(it => accordion(`${it.code} — ${it.msg.length > 80 ? it.msg.slice(0, 80) + "…" : it.msg}`,
-      findingDetailHtml(it, App.state.rules ? App.state.rules.find(r => r.code === it.code) : null)
-      + sourceExcerpt(App.state.upf.split("\n"), locLines(it)), {})).join("");
-    if (filtered.length > 12) html += `<div class="mono" style="font-size:11px;color:var(--text-muted)">… ${filtered.length - 12} more details; all findings are in the table above.</div>`;
-    html += `</div>`;
+    html += `<p class="mono" style="font-size:11px;color:var(--text-muted);margin:6px 0 0">Click any row for rule detail, how-to-fix guidance and source context.</p>`;
   }
 
   html += sectionTitle("Source", "line numbers · finding highlights");
@@ -479,8 +471,8 @@ function renderReadiness(a) {
   (rdy.advisories || []).slice(0, 10).forEach(ad => {
     h += `<div class="ilink"><span class="il-rule">${esc(ad.code || "ADV")}</span><span class="il-kind" style="color:var(--accent-2)">ADVISORY</span><span class="il-a">${esc(ad.message)}</span></div>`;
   });
-  (rdy.notes || []).forEach(n => h += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">— ${esc(n)}</div>`);
-  h += `<p class="callout co-warning"><span><strong>READY ≠ signoff</strong> — this is a power-intent review, not a power/IR signoff.</span></p>`;
+  (rdy.notes || []).forEach(n => h += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">- ${esc(n)}</div>`);
+  h += `<p class="callout co-warning"><span><strong>READY ≠ signoff</strong> - this is a power-intent review, not a power/IR signoff.</span></p>`;
   return h;
 }
 
@@ -488,7 +480,7 @@ function renderCoverage(a) {
   const cov = a.coverage || {};
   if (cov.domain_coverage === undefined && !(cov.domains || []).length) return "";
   let h = sectionTitle("Power-intent coverage", "what the intent touches");
-  h += `<p class="callout co-info"><span><strong>Coverage is NOT correctness</strong> — a fully covered design can still have power-intent errors.</span></p>`;
+  h += `<p class="callout co-info"><span><strong>Coverage is NOT correctness</strong> - a fully covered design can still have power-intent errors.</span></p>`;
   h += metricRow([
     { label: "Domains covered", value: (cov.domains || []).filter(d => d.covered).length + "/" + (cov.domains || []).length },
     { label: "Unreferenced supplies", value: (cov.unreferenced_supplies || []).length },
@@ -517,17 +509,18 @@ function renderSupport(a) {
   h += metricRow(
     Object.entries(sup.statuses || {}).map(([k, v]) => ({ label: k.replace(/_/g, " "), value: v }))
   );
-  (sup.notes || []).forEach(n => h += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">— ${esc(n)}</div>`);
-  h += `<p class="callout co-info"><span><strong>Deterministic engine</strong> — no LLM, no model inference. Analysis is local, reproducible and offline-capable.</span></p>`;
+  (sup.notes || []).forEach(n => h += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">- ${esc(n)}</div>`);
+  h += `<p class="callout co-info"><span><strong>Deterministic engine</strong> - no LLM, no model inference. Analysis is local, reproducible and offline-capable.</span></p>`;
   return h;
 }
 
 /* ── Supply Network ─────────────────────────────────────────────────────── */
 export async function pageSupply() {
   const a = App.state.analysis;
-  let html = pageHead("RESULTS", "Supply Network", "Domains, supply ports/nets/sets and power switches behind your power intent.");
+  let html = pageHead("RESULTS", "Supply Network", "Domains, supply ports/nets/sets and power switches behind your power intent.",
+                      "Provide a UPF below and press Analyze - the supply network renders here.");
   if (!a || !a.model) {
-    html += emptyState("No supply network yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Supply Network", "Drop your IEEE 1801 UPF in here - domains, supply ports/nets/sets and switches render in place.");
     return html + "</div>";
   }
   const m = a.model || {};
@@ -555,8 +548,8 @@ export async function pageSupply() {
     html += sectionTitle("Power switches");
     html += table([{ label: "Switch" }, { label: "Input" }, { label: "Output" }, { label: "Control" }, { label: "On state" }],
       sws.map(s => ({ key: s.name, cells: [
-        { html: `<span class="mono">${esc(s.name)}</span>` }, esc(s.input_supply || "—"), esc(s.output_supply || "—"),
-        esc(s.control_port || "—"), esc(s.on_state || "—"),
+        { html: `<span class="mono">${esc(s.name)}</span>` }, esc(s.input_supply || "-"), esc(s.output_supply || "-"),
+        esc(s.control_port || "-"), esc(s.on_state || "-"),
       ] })));
   }
 
@@ -575,29 +568,30 @@ export async function pageSupply() {
 /* ── Power State Table ──────────────────────────────────────────────────── */
 export async function pagePST() {
   const a = App.state.analysis;
-  let html = pageHead("RESULTS", "Power States", "Declared supply states and the Power State Table (PST) rows.");
+  let html = pageHead("RESULTS", "Power States", "Declared supply states and the Power State Table (PST) rows.",
+                      "Provide a UPF below and press Analyze - the PST matrix renders here.");
   if (!a) {
-    html += emptyState("No power states yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Power States", "Drop your IEEE 1801 UPF in here - declared supply states and the PST matrix render in place.");
     return html + "</div>";
   }
   const pst = a.pst || {};
   const m = a.model || {};
   const states = (m.supply_states || []);
   html += metricRow([
-    { label: "PST", value: pst.pst_name || "—" }, { label: "PST states", value: pst.state_count ?? 0 },
+    { label: "PST", value: pst.pst_name || "-" }, { label: "PST states", value: pst.state_count ?? 0 },
     { label: "Declared states", value: (pst.declared_supply_states || []).length },
     { label: "Used", value: (pst.used_supply_states || []).length },
     { label: "Unused", value: (pst.unused_states || []).length },
     { label: "Undeclared", value: (pst.undeclared_states || []).length },
   ]);
-  if (pst.coverage_note) html += `<p class="callout ${pst.undeclared_states && pst.undeclared_states.length ? "co-warning" : "co-info"}"><span><strong>Coverage</strong> — ${esc(pst.coverage_note)}</span></p>`;
+  if (pst.coverage_note) html += `<p class="callout ${pst.undeclared_states && pst.undeclared_states.length ? "co-warning" : "co-info"}"><span><strong>Coverage</strong> - ${esc(pst.coverage_note)}</span></p>`;
 
   if (states.length) {
     html += sectionTitle("Declared supply states", `${states.length} state(s)`);
     html += table([{ label: "State" }, { label: "Parent" }, { label: "Type" }, { label: "Voltage" }],
       states.map(s => ({ key: s.name + (s.parent || ""), cells: [
-        { html: `<span class="mono">${esc(s.name)}</span>` }, esc(s.parent || "—"), esc(s.type || "supply_state"),
-        { html: `<span class="num">${s.voltage != null ? esc(s.voltage) + " V" : "—"}</span>` },
+        { html: `<span class="mono">${esc(s.name)}</span>` }, esc(s.parent || "-"), esc(s.type || "supply_state"),
+        { html: `<span class="num">${s.voltage != null ? esc(s.voltage) + " V" : "-"}</span>` },
       ] })));
   }
 
@@ -607,7 +601,7 @@ export async function pagePST() {
       html += pstMatrixHtml(p);
     });
     html += sectionTitle("Transitions");
-    html += `<div class="mono" style="font-size:12px;color:var(--text-secondary)">${esc((pst.transitions || []).map(t => `${t[0]} → ${t[1]}`).join(" · ") || "—")}</div>`;
+    html += `<div class="mono" style="font-size:12px;color:var(--text-secondary)">${esc((pst.transitions || []).map(t => `${t[0]} → ${t[1]}`).join(" · ") || "-")}</div>`;
   }
   return html + "</div>";
 }
@@ -615,9 +609,10 @@ export async function pagePST() {
 /* ── Strategies ─────────────────────────────────────────────────────────── */
 export async function pageStrategies() {
   const a = App.state.analysis;
-  let html = pageHead("RESULTS", "Strategies", "Isolation, retention and level-shifter strategies in your power intent.");
+  let html = pageHead("RESULTS", "Strategies", "Isolation, retention and level-shifter strategies in your power intent.",
+                      "Provide a UPF below and press Analyze - the strategy tables render here.");
   if (!a || !a.model) {
-    html += emptyState("No strategies yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Strategies", "Drop your IEEE 1801 UPF in here - isolation, retention and level-shifter strategies render in place.");
     return html + "</div>";
   }
   const m = a.model || {};
@@ -630,8 +625,8 @@ export async function pageStrategies() {
     html += sectionTitle("Isolation", `${(m.isolation || []).length} strategy(ies)`);
     html += table([{ label: "Domain" }, { label: "Location" }, { label: "Clamp" }, { label: "Applies to" }, { label: "Control" }, { label: "Supply" }],
       m.isolation.map(s => ({ key: s.domain + (s.control_signal || ""), cells: [
-        { html: `<span class="mono">${esc(s.domain)}</span>` }, esc(s.location || "self"), esc(s.clamp_value || "—"),
-        esc(s.applies_to || "outputs"), esc(s.control_signal || "—"), esc(s.isolation_supply || "—"),
+        { html: `<span class="mono">${esc(s.domain)}</span>` }, esc(s.location || "self"), esc(s.clamp_value || "-"),
+        esc(s.applies_to || "outputs"), esc(s.control_signal || "-"), esc(s.isolation_supply || "-"),
       ] })));
   }
   if ((m.level_shifters || []).length) {
@@ -639,14 +634,14 @@ export async function pageStrategies() {
     html += table([{ label: "Domain" }, { label: "Location" }, { label: "Rule" }, { label: "Threshold" }],
       m.level_shifters.map(s => ({ key: s.domain, cells: [
         { html: `<span class="mono">${esc(s.domain)}</span>` }, esc(s.location || "self"), esc(s.rule || "low_to_high"),
-        { html: `<span class="num">${s.threshold != null ? esc(s.threshold) : "—"}</span>` },
+        { html: `<span class="num">${s.threshold != null ? esc(s.threshold) : "-"}</span>` },
       ] })));
   }
   if ((m.retentions || []).length) {
     html += sectionTitle("Retention", `${(m.retentions || []).length} strategy(ies)`);
     html += table([{ label: "Domain" }, { label: "Supply" }, { label: "Save" }, { label: "Restore" }],
       m.retentions.map(s => ({ key: s.domain, cells: [
-        { html: `<span class="mono">${esc(s.domain)}</span>` }, esc(s.retention_supply || "—"), esc(s.save_signal || "—"), esc(s.restore_signal || "—"),
+        { html: `<span class="mono">${esc(s.domain)}</span>` }, esc(s.retention_supply || "-"), esc(s.save_signal || "-"), esc(s.restore_signal || "-"),
       ] })));
   }
   return html + "</div>";
@@ -656,9 +651,9 @@ export async function pageStrategies() {
 export async function pageDesign() {
   const a = App.state.analysis;
   let html = pageHead("RESULTS", "Design", "The netlist snapshot behind your design-aware rules (UPF-080…084).",
-                      "Add a design context JSON in New Analysis to unlock the design-aware layer.");
+                      "Provide a UPF below and press Analyze - the design-aware layer renders here when a netlist snapshot is supplied.");
   if (!a) {
-    html += emptyState("No design context", "Add a design snapshot to enable the design-aware layer.", "Open New Analysis, paste a design JSON, and re-analyze.");
+    html += standaloneAnalyzeHtml("Design", "Drop your IEEE 1801 UPF in here. The design-aware layer (UPF-080…084) also needs a netlist snapshot - without one, UPF-only analysis still runs and reports the boundary honestly.");
     return html + "</div>";
   }
   const design = (a.model || {}).design;
@@ -666,7 +661,7 @@ export async function pageDesign() {
     html += emptyState("Design context not supplied", "The design-aware layer (UPF-080…084) is silent without a design snapshot.", "Add the design JSON in New Analysis and re-analyze.");
     return html + "</div>";
   }
-  html += `<p class="callout co-info"><span><strong>Design-aware rules active</strong> — UPF-080…084 validate instances, control signals, crossings, retention coverage and PG pins against this snapshot.</span></p>`;
+  html += `<p class="callout co-info"><span><strong>Design-aware rules active</strong> - UPF-080…084 validate instances, control signals, crossings, retention coverage and PG pins against this snapshot.</span></p>`;
   const inst = design.instances || {};
   const instKeys = Object.keys(inst);
   html += metricRow([
@@ -680,7 +675,7 @@ export async function pageDesign() {
     html += table([{ label: "Instance" }, { label: "Module" }, { label: "Sequential" }],
       instKeys.map(n => ({ key: n, cells: [
         { html: `<span class="mono">${esc(n)}</span>` },
-        { html: `<span class="mono">${esc(inst[n].module || "—")}</span>` },
+        { html: `<span class="mono">${esc(inst[n].module || "-")}</span>` },
         inst[n].sequential ? "yes" : "no",
       ] })));
   }
@@ -710,13 +705,13 @@ export async function pageDesign() {
 export async function pageCoverage() {
   const a = App.state.analysis;
   let html = pageHead("RESULTS", "Coverage", "Is every power domain and supply accounted for?",
-                      "A fully covered design is not a correct design — review the evidence.");
+                      "A fully covered design is not a correct design - provide a UPF below and press Analyze.");
   if (!a || !a.coverage || a.coverage.domain_coverage === undefined) {
-    html += emptyState("No coverage yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Coverage", "Drop your IEEE 1801 UPF in here - domain and supply coverage renders in place. Coverage is not correctness.");
     return html + "</div>";
   }
   const cov = a.coverage;
-  html += `<p class="callout co-info"><span><strong>Coverage is NOT correctness</strong> — coverage reports what the intent touches, never that it is right.</span></p>`;
+  html += `<p class="callout co-info"><span><strong>Coverage is NOT correctness</strong> - coverage reports what the intent touches, never that it is right.</span></p>`;
   html += metricRow([
     { label: "Domain coverage", value: Math.round(cov.domain_coverage * 100) + "%" },
     { label: "Supply coverage", value: Math.round(cov.supply_coverage * 100) + "%" },
@@ -738,8 +733,163 @@ export async function pageCoverage() {
     html += sectionTitle("Unreferenced supplies");
     html += `<div class="mono" style="font-size:12px;color:var(--text-secondary)">${esc(cov.unreferenced_supplies.join(", "))}</div>`;
   } else {
-    html += `<p class="callout co-success"><span><strong>All declared supplies are referenced</strong> — no unreferenced supplies.</span></p>`;
+    html += `<p class="callout co-success"><span><strong>All declared supplies are referenced</strong> - no unreferenced supplies.</span></p>`;
   }
+  return html + "</div>";
+}
+
+/* ── Domain Relations (Power Domain Relation Matrix) ────────────────────── */
+export async function pageRelations() {
+  const a = App.state.analysis;
+  let html = pageHead("ANALYZE", "Domain Relations", "The power-domain relation graph: which domains interact, how they are powered, and where each domain is owned - three views of one canonical model, every cell derived with provenance, never inferred in the UI.",
+                      "Analyze a UPF below to see the relation matrix, supply network and hierarchy map, then click any matrix cell for its evidence.");
+  if (!a || !a.relations) {
+    html += standaloneAnalyzeHtml("Domain Relations", "Drop your IEEE 1801 UPF in here - the power-domain relation matrix, supply network, domain types and topology render in place. A supply shared between domains is NOT shown as an interaction; empty cells mean no proven crossing.");
+    return html + "</div>";
+  }
+  const rel = a.relations;
+  const domains = rel.domains || [];
+  const relations = rel.relations || [];
+  const matrix = rel.matrix || {};
+  const names = domains.map(d => d.name);
+  const nAon = domains.filter(d => d.type === "ALWAYS_ON").length;
+  const nSw = domains.filter(d => d.type === "SWITCHABLE").length;
+  const nUnk = domains.filter(d => d.type === "UNKNOWN").length;
+
+  html += metricRow([
+    { label: "Architecture", value: rel.architecture || "-" },
+    { label: "Domains", value: domains.length },
+    { label: "Always-on", value: nAon },
+    { label: "Switchable", value: nSw },
+    { label: "Unknown type", value: nUnk },
+    { label: "Relations", value: relations.length },
+  ]);
+
+  // ---- Domain cards with EXPLICIT relationships (never a bare "related") ----
+  html += sectionTitle("Power domains", "power type is evidence-based: SWITCHABLE requires switch evidence, ALWAYS-ON requires explicit always-on evidence, otherwise UNKNOWN");
+  html += `<div class="rel-dom-grid">`;
+  domains.forEach(d => {
+    const tBadge = d.type === "SWITCHABLE"
+      ? `<span class="sdc-status sev-warning"><span class="sh tri"></span>SWITCHABLE</span>`
+      : d.type === "ALWAYS_ON"
+        ? `<span class="sdc-status sev-success"><span class="sh circ"></span>ALWAYS-ON</span>`
+        : `<span class="sdc-status sev-muted"><span class="sh circ"></span>UNKNOWN</span>`;
+    const outRels = relations.filter(r => r.from_domain === d.name);
+    const inRels = relations.filter(r => r.to_domain === d.name);
+    const outList = outRels.map(r => `${esc(r.to_domain)} · ${esc(r.label)}`).join(", ") || "none";
+    const inList = inRels.map(r => `${esc(r.from_domain)} · ${esc(r.label)}`).join(", ") || "none";
+    html += `<div class="rel-dom-card" data-rel-type="${escAttr(d.type)}">
+      <div class="rel-dom-head"><span class="mono rel-dom-name">${esc(d.name)}</span>${tBadge}</div>
+      <div class="kv" style="margin-top:8px">
+        <dt>Scope</dt><dd class="mono">${esc(d.scope || ".")}</dd>
+        <dt>Power</dt><dd class="mono">${esc(d.primary_power || "-")}</dd>
+        <dt>Ground</dt><dd class="mono">${esc(d.primary_ground || "-")}</dd>
+        <dt>Switch</dt><dd class="mono">${esc(d.switch || "-")}</dd>
+        <dt>Elements</dt><dd class="mono">${esc((d.elements || []).join(", ") || "-")}</dd>
+        <dt>Outbound</dt><dd class="mono">${esc(outList)}</dd>
+        <dt>Inbound</dt><dd class="mono">${esc(inList)}</dd>
+        ${d.declared_file ? `<dt>Source</dt><dd class="mono">${esc(d.declared_file)}${d.declared_line ? ":L" + esc(String(d.declared_line)) : ""}</dd>` : ""}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // ---- Matrix: cross-domain interactions ONLY (supply sharing is separate) ----
+  html += sectionTitle("Power Domain Relation Matrix", "FROM row -> TO column · ISO isolation · LS level shift · ISO+LS both · RET retention · SW switch · CTRL control - sharing a supply is NOT an interaction and never appears here");
+  if (!names.length) {
+    html += emptyState("No domains", "The model has no power domains to relate.", "Add create_power_domain commands and re-analyze.");
+  } else {
+    html += `<div class="matrix-wrap"><table class="matrix">`;
+    html += `<thead><tr><th class="corner">FROM \ TO</th>${names.map(n => `<th>${esc(n)}</th>`).join("")}</tr></thead><tbody>`;
+    names.forEach(f => {
+      html += `<tr><td class="corner mono">${esc(f)}</td>`;
+      names.forEach(t => {
+        const label = f === t ? "-" : (matrix[f] || {})[t] || "";
+        const cls = f === t ? "cell mx-unknown" : !label ? "cell mx-unknown" : label.indexOf("ISO") >= 0 ? "cell mx-excl" : "cell mx-sync";
+        html += `<td class="${cls}" data-rel-cell="${escAttr(f)}|${escAttr(t)}" title="${f === t ? esc(f) + " (self)" : label ? esc(f) + " -> " + esc(t) + ": " + esc(label) : esc(f) + " -> " + esc(t) + ": no proven interaction"}">${f === t ? "·" : label ? esc(label) : ""}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    html += `<p class="mono" style="font-size:11px;color:var(--text-muted)">Empty cells are honest: no proven cross-domain interaction. Click a filled cell for evidence, provenance and next actions.</p>`;
+  }
+
+  // ---- Relation list with evidence ----
+  if (relations.length) {
+    html += sectionTitle("Relations", `${relations.length} proven interaction(s) with provenance`);
+    relations.forEach(r => {
+      const ev = (r.evidence || [])[0];
+      const loc = ev && ev.line ? ` L${ev.line}${ev.file ? " in " + esc(ev.file) : ""}` : "";
+      html += `<div class="ilink" data-rel-detail="${escAttr(r.from_domain)}|${escAttr(r.to_domain)}">
+        <span class="il-rule">${esc(r.from_domain)} → ${esc(r.to_domain)}</span>
+        <span class="il-kind" style="color:var(--accent)">${esc(r.label)}</span>
+        <span class="il-a">${ev ? esc(ev.detail) + "<span class=\"mono\" style=\"color:var(--text-muted)\">" + esc(loc) + "</span>" : "no evidence recorded"}</span>
+        <span class="il-loc"><button class="btn btn-sm btn-ghost" data-rel-ev="${escAttr(r.from_domain)}|${escAttr(r.to_domain)}" type="button">Evidence</button></span>
+      </div>`;
+    });
+  } else {
+    html += `<p class="callout co-info"><span><strong>No interactions detected</strong> - the engine found no switch, isolation, level-shift, retention or control link between domains. Empty matrix cells are not defects; they mean no proven crossing.</span></p>`;
+  }
+
+  // ---- Supply network: separate from domain relations ----
+  const sharing = rel.supply_sharing || {};
+  html += sectionTitle("Supply network", "which supply powers which domains - a shared net is not a domain interaction");
+  if (Object.keys(sharing).length) {
+    html += table([{ label: "Supply" }, { label: "Domains" }],
+      Object.entries(sharing).map(([net, ds]) => ({ key: net, cells: [
+        { html: `<span class="mono">${esc(net)}</span>` },
+        { html: `<span class="mono">${esc(ds.join(", "))}</span>` },
+      ] })));
+  } else {
+    html += `<p class="callout co-info"><span><strong>No supply mapping</strong> - no domain has a resolvable primary power/ground net.</span></p>`;
+  }
+
+  // ---- Hierarchy map: file / scope / owner ownership ----
+  const hier = rel.hierarchy || [];
+  html += sectionTitle("Domain ownership", rel.architecture === "HIERARCHICAL" ? "UPF file · scope · owning RTL instance - where each domain is defined" : "flat design - every domain lives in the top scope");
+  if (hier.length) {
+    html += table([{ label: "Domain" }, { label: "UPF file" }, { label: "Scope" }, { label: "Owner" }],
+      hier.map(h => ({ key: h.domain + (h.scope || ""), cells: [
+        { html: `<span class="mono">${esc(h.domain)}</span>` },
+        { html: `<span class="mono">${esc(h.upf_file || "-")}</span>` },
+        { html: `<span class="mono">${esc(h.scope || ".")}</span>` },
+        { html: `<span class="mono">${esc(h.owner || "-")}</span>` },
+      ] })));
+  }
+  if (rel.architecture === "HIERARCHICAL" && (rel.files || []).length) {
+    html += `<div class="mono" style="font-size:11.5px;color:var(--text-secondary);margin-top:8px">UPF project: ${esc(rel.files.join(" · "))}</div>`;
+  }
+
+  // ---- Supply maps: load_upf -supply (local supply -> parent supply) ----
+  const smaps = rel.supply_maps || [];
+  if (rel.architecture === "HIERARCHICAL" && smaps.length) {
+    html += sectionTitle("Supply maps", "load_upf -supply binds each child's local supply to a parent supply - the integration contract across hierarchy");
+    html += table([{ label: "Scope" }, { label: "Local supply" }, { label: "Parent supply" }, { label: "Source" }],
+      smaps.map(m => ({ key: (m.scope || "") + m.local + m.line, cells: [
+        { html: `<span class="mono">${esc(m.scope || ".")}</span>` },
+        { html: `<span class="mono">${esc(m.local || "-")}</span>` },
+        { html: `<span class="mono">${esc(m.parent || "-")}</span>` },
+        { html: `<span class="mono">${esc(m.file ? String(m.file).split(/[\\/]/).pop() : "-")}${m.line ? ":L" + String(m.line) : ""}</span>` },
+      ] })));
+  }
+
+  // ---- Topology: AON anchors, switchable leaves, unclassified - never nested ----
+  const aon = domains.filter(d => d.type === "ALWAYS_ON").map(d => d.name);
+  const sw = domains.filter(d => d.type === "SWITCHABLE").map(d => d.name);
+  const others = domains.filter(d => d.type === "UNKNOWN").map(d => d.name);
+  html += sectionTitle("Power topology", "always-on anchors and switchable leaves; unclassified domains are listed separately, never drawn as if they belong to the AON area");
+  html += `<div class="rel-topo">`;
+  html += `<div class="rel-topo-block"><div class="rel-topo-label">ALWAYS-ON ANCHORS</div><div class="rel-topo-body">${aon.length ? aon.map(n => `<span class="rel-topo-node rel-topo-aon">${esc(n)}</span>`).join("") : `<span class="rel-topo-none">No always-on domain identified - the model has no switch or explicit always-on evidence.</span>`}</div></div>`;
+  if (sw.length) {
+    html += `<div class="rel-topo-edge">│</div>`;
+    html += `<div class="rel-topo-block"><div class="rel-topo-label">SWITCHABLE</div><div class="rel-topo-body">${sw.map(n => `<span class="rel-topo-node rel-topo-sw">${esc(n)}</span>`).join("")}</div></div>`;
+  }
+  if (others.length) {
+    html += `<div class="rel-topo-edge">│</div>`;
+    html += `<div class="rel-topo-block"><div class="rel-topo-label">UNCLASSIFIED</div><div class="rel-topo-body">${others.map(n => `<span class="rel-topo-node rel-topo-unk">${esc(n)}</span>`).join("")}</div></div>`;
+  }
+  html += `</div>`;
+  html += `<p class="callout co-info"><span><strong>Matrix semantics</strong> - cells show cross-domain interactions the engine can prove from the model. Empty cells are honest, supply sharing is a separate view, and a relation is never invented by the UI.</span></p>`;
   return html + "</div>";
 }
 
@@ -747,9 +897,9 @@ export async function pageCoverage() {
 export async function pageReadiness() {
   const a = App.state.analysis;
   let html = pageHead("RESULTS", "Health", "Is this power intent ready to hand to implementation?",
-                      "Resolve blockers first, then review items — READY is not a signoff.");
+                      "Resolve blockers first, then review items - provide a UPF below and press Analyze.");
   if (!a || !a.readiness || !a.readiness.overall) {
-    html += emptyState("No readiness yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Health", "Drop your IEEE 1801 UPF in here - the five-dimension readiness verdict renders in place. READY is not a signoff.");
     return html + "</div>";
   }
   const rdy = a.readiness;
@@ -767,8 +917,8 @@ export async function pageReadiness() {
     html += sectionTitle(`Advisories (${rdy.advisories.length})`);
     rdy.advisories.forEach(ad => html += `<div class="ilink"><span class="il-rule">${esc(ad.code || "ADV")}</span><span class="il-kind" style="color:var(--accent-2)">ADVISORY</span><span class="il-a">${esc(ad.message)}</span></div>`);
   }
-  (rdy.notes || []).forEach(n => html += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">— ${esc(n)}</div>`);
-  html += `<p class="callout co-warning"><span><strong>READY ≠ signoff</strong> — READY means no rule fired within the supported scope. It is not a power/IR signoff.</span></p>`;
+  (rdy.notes || []).forEach(n => html += `<div class="mono" style="font-size:11.5px;color:var(--text-muted)">- ${esc(n)}</div>`);
+  html += `<p class="callout co-warning"><span><strong>READY ≠ signoff</strong> - READY means no rule fired within the supported scope. It is not a power/IR signoff.</span></p>`;
   return html + "</div>";
 }
 
@@ -776,9 +926,9 @@ export async function pageReadiness() {
 export async function pageSupport() {
   const a = App.state.analysis;
   let html = pageHead("RESULTS", "Support", "What UPF-Insight validated, partially validated, and skipped.",
-                      "A clean result means 'no rule fired', never 'power intent proven correct'.");
+                      "A clean result means 'no rule fired', never 'power intent proven correct' - provide a UPF below and press Analyze.");
   if (!a || !a.support) {
-    html += emptyState("No support boundary yet", "Run a validation first.", "Open New Analysis and press Analyze.");
+    html += standaloneAnalyzeHtml("Support", "Drop your IEEE 1801 UPF in here - the validated/partial/skipped boundary renders in place.");
     return html + "</div>";
   }
   const sup = a.support;
@@ -788,35 +938,82 @@ export async function pageSupport() {
     Object.entries(sup.statuses || {}).map(([k, v]) => ({ label: k.replace(/_/g, " "), value: v }))
   );
   (sup.notes || []).forEach(n => html += `<div class="ilink"><span class="il-rule">NOTE</span><span class="il-a">${esc(n)}</span></div>`);
-  html += `<p class="callout co-info"><span><strong>Deterministic engine</strong> — no LLM, no model inference, no external AI APIs. Local, reproducible, offline-capable.</span></p>`;
+  html += `<p class="callout co-info"><span><strong>Deterministic engine</strong> - no LLM, no model inference, no external AI APIs. Local, reproducible, offline-capable.</span></p>`;
   return html + "</div>";
 }
 
 /* ── Rules ──────────────────────────────────────────────────────────────── */
+/* SDC Rules Reference style: search + filters + stat cards + downloads,
+   then collapsible rule cards per layer. Only real registry fields are shown
+   (code, severity, layer, title, description) - nothing fabricated. */
 export async function pageRules() {
-  let html = pageHead("TOOLS", "Rules Registry", `${App.state.rules ? App.state.rules.length : "…"} deterministic rules across six layers.`);
   if (!App.state.rules) {
     try { App.state.rules = (await get("/api/rules")).rules || []; }
     catch (e) { App.state.rules = []; }
-    html = pageHead("TOOLS", "Rules Registry", `${App.state.rules.length} deterministic rules across six layers.`);
   }
+  const all = App.state.rules || [];
+  const q = (App.state.ruleQ || "").toLowerCase();
   const sev = App.state.ruleFilter || "All";
-  const rules = sev === "All" ? App.state.rules : App.state.rules.filter(r => r.severity === sev);
-  html += `<div class="filters"><div class="f-field"><label>Severity</label>${segFilter("rule-sev", ["All", "error", "warning", "info"], sev)}</div></div>`;
+  const layer = App.state.ruleLayer || "All";
+  const layers = ["All", ...new Set(all.map(r => r.layer))];
+  let rules = all.filter(r =>
+    (sev === "All" || r.severity === sev) &&
+    (layer === "All" || r.layer === layer) &&
+    (!q || (r.code + " " + r.title + " " + r.description).toLowerCase().includes(q)));
+  const nErr = rules.filter(r => r.severity === "error").length;
+  const nWarn = rules.filter(r => r.severity === "warning").length;
+  const nInfo = rules.filter(r => r.severity === "info").length;
+
+  let html = pageHead("TOOLS", "Rules Reference", `All ${all.length} rule codes across six layers.`);
+  html += `<div class="rules-toolbar">
+    <button class="btn btn-primary" id="rules-gen" type="button">Generate UPF</button>
+    <div class="filters">
+      <div class="f-field f-grow"><label>Search</label><input class="opt-input" id="rule-q" type="text" placeholder="UPF-060, retention, isolation..." value="${escAttr(App.state.ruleQ || "")}" aria-label="Search rules"></div>
+      <div class="f-field"><label>Layer</label><select class="opt-select" id="rule-layer">${layers.map(l => `<option value="${escAttr(l)}"${l === layer ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+      <div class="f-field"><label>Severity</label>${segFilter("rule-sev", ["All", "error", "warning", "info"], sev)}</div>
+    </div>
+  </div>`;
+  html += `<div class="stat-grid">
+    <div class="stat-card sc-blue"><span class="sc-icon">🔍</span><span class="sc-num">${rules.length}</span><span class="sc-label">FILTERED</span></div>
+    <div class="stat-card sc-red"><span class="sc-icon">●</span><span class="sc-num">${nErr}</span><span class="sc-label">ERRORS</span></div>
+    <div class="stat-card sc-orange"><span class="sc-icon">●</span><span class="sc-num">${nWarn}</span><span class="sc-label">WARNINGS</span></div>
+    <div class="stat-card sc-gray"><span class="sc-icon">ℹ</span><span class="sc-num">${nInfo}</span><span class="sc-label">INFO</span></div>
+  </div>`;
+  html += `<div class="rules-dl">
+    <button class="btn btn-sm" id="rules-dl-json" type="button">⬇ Download JSON</button>
+    <button class="btn btn-sm" id="rules-dl-md" type="button">⬇ Download Markdown</button>
+    <span class="mono" style="font-size:11px;color:var(--text-muted)">real registry data - ${rules.length} rule(s)</span>
+  </div>`;
+
+  if (!rules.length) {
+    html += emptyState("No rules match", "No rules match the current search and filters.", "Clear or loosen the filters to see the full registry.");
+    return html + "</div>";
+  }
   const byLayer = {};
   rules.forEach(r => (byLayer[r.layer] = byLayer[r.layer] || []).push(r));
-  Object.entries(byLayer).forEach(([layer, rs]) => {
-    html += sectionTitle(layer, `${rs.length} rule(s)`);
+  Object.entries(byLayer).forEach(([layerName, rs]) => {
+    html += `<details class="rule-module"${layer === "All" ? " open" : ""}>
+      <summary><span class="rm-chev">▼</span><span class="rm-name">${esc(layerName.toLowerCase())} (${rs.length} rule${rs.length === 1 ? "" : "s"})</span></summary>
+      <div class="rm-body">`;
     rs.forEach(r => {
-      html += `<div class="rule-row"><span class="rule-code">${esc(r.code)}</span> <span class="rule-name">${esc(r.title)}</span> ${statusBadge("severity", r.severity)}<div class="rule-desc">${esc(r.description)}</div></div>`;
+      const sevColor = r.severity === "error" ? "var(--error)" : r.severity === "warning" ? "var(--warning)" : "var(--text-muted)";
+      html += `<details class="rule-card" data-code="${escAttr(r.code)}">
+        <summary class="rc-summary"><span class="rc-sev" style="color:${sevColor}">●</span><span class="rc-code">${esc(r.code)}</span><span class="rc-title">${esc(r.title)}</span></summary>
+        <div class="rc-body">
+          <div class="rc-meta">${statusBadge("severity", r.severity)}<span class="rc-chip">${esc(r.layer)}</span></div>
+          <p class="rc-desc">${esc(r.description)}</p>
+          ${RULE_FIXES[r.code] ? `<div class="rc-fix"><div class="rc-fix-k">How to fix</div><p class="rc-fix-t">${esc(RULE_FIXES[r.code])}</p></div>` : ""}
+        </div>
+      </details>`;
     });
+    html += `</div></details>`;
   });
   return html + "</div>";
 }
 
 /* ── Export ─────────────────────────────────────────────────────────────── */
 export async function pageExport() {
-  let html = pageHead("RESULTS", "Export", "Real exportable evidence — JSON result, readiness snapshot (CLI).");
+  let html = pageHead("RESULTS", "Export", "Real exportable evidence - JSON result, readiness snapshot (CLI).");
   const a = App.state.analysis;
   if (!a) {
     html += emptyState("Nothing to export", "Run a validation first, then export the evidence.", "Open New Analysis and press Analyze.");
@@ -838,7 +1035,7 @@ export async function pageTrust() {
   let html = pageHead("TOOLS", "Trust Model", "What UPF-Insight validates, what it partially validates, and what it does not claim.");
   html += sectionTitle("Boundary statements");
   [
-    ["READY ≠ SIGNOFF", "READY means the power intent satisfies the validator's supported, evidence-backed criteria — not that power/IR or timing passes."],
+    ["READY ≠ SIGNOFF", "READY means the power intent satisfies the validator's supported, evidence-backed criteria - not that power/IR or timing passes."],
     ["COVERAGE ≠ CORRECTNESS", "A fully covered design does not prove correct power intent."],
     ["STRUCTURAL ≠ IMPLEMENTED", "Resolving references and strategies does not prove the implemented power network matches the intent."],
   ].forEach(([t, d]) => html += `<div class="ilink"><span class="il-rule">≠</span><span class="il-kind" style="color:var(--warning)">${esc(t)}</span><span class="il-a">${esc(d)}</span></div>`);
@@ -857,13 +1054,13 @@ export async function pageTrust() {
     "Design-aware checks (UPF-080…084) → requires a netlist snapshot",
     "Power/IR drop, electromigration, thermal, timing closure → requires implementation signoff tools",
   ].forEach(t => html += `<div class="ilink"><span class="il-rule">△</span><span class="il-a">${esc(t)}</span></div>`);
-  html += `<p class="callout co-info"><span><strong>Deterministic engine</strong> — no LLM, no model inference, no external AI APIs. Analysis is local, reproducible and offline-capable.</span></p>`;
+  html += `<p class="callout co-info"><span><strong>Deterministic engine</strong> - no LLM, no model inference, no external AI APIs. Analysis is local, reproducible and offline-capable.</span></p>`;
   return html + "</div>";
 }
 
 /* ── Documentation ──────────────────────────────────────────────────────── */
 export async function pageDocumentation() {
-  let html = pageHead("TOOLS", "Documentation", "Repository documentation, CLI reference and evidence — real entries only.");
+  let html = pageHead("TOOLS", "Documentation", "Repository documentation, CLI reference and evidence - real entries only.");
   const rules = App.state.rules;
   html += `<div class="kv" style="margin:8px 0">`;
   html += `<dt>Engine</dt><dd class="mono">deterministic · local-first · offline-capable</dd>`;
@@ -871,23 +1068,36 @@ export async function pageDocumentation() {
   html += `<dt>CLI</dt><dd class="mono">upf-insight check · model · pst · report · web</dd>`;
   html += `</div>`;
   html += sectionTitle("Reference");
-  html += `<div class="ilink"><span class="il-rule">ROOT</span><span class="il-a">README.md — product overview and quick start</span></div>`;
-  html += `<div class="ilink"><span class="il-rule">RULES</span><span class="il-a">docs/upf/RULES_REGISTRY.md — rule registry and codes</span></div>`;
-  html += `<div class="ilink"><span class="il-rule">BENCH</span><span class="il-a">docs/upf/BENCHMARK_EVIDENCE_MAP.md — evidence suites</span></div>`;
+  html += `<div class="ilink"><span class="il-rule">ROOT</span><span class="il-a">README.md - product overview and quick start</span></div>`;
+  html += `<div class="ilink"><span class="il-rule">RULES</span><span class="il-a">docs/upf/RULES_REGISTRY.md - rule registry and codes</span></div>`;
+  html += `<div class="ilink"><span class="il-rule">BENCH</span><span class="il-a">docs/upf/BENCHMARK_EVIDENCE_MAP.md - evidence suites</span></div>`;
+
+  html += sectionTitle("UPF challenges", "why power intent is hard in real designs");
+  [
+    ["Multi-voltage designs", "Different blocks need different voltage levels; coordinating transitions between domains while preserving timing and signal integrity is complex.", "CHALLENGE"],
+    ["Power domain interactions", "Domains interact during voltage scaling and state transitions; mishandling causes glitches, signal-integrity problems and higher power.", "CHALLENGE"],
+    ["Advanced low-power techniques", "Body biasing, power gating and DVFS need precise control and coordination, and must stay backward compatible with the UPF framework.", "CHALLENGE"],
+    ["EDA tool support", "Tools do not always interpret UPF constructs identically, so the same intent can behave differently across flows; intent must be explicit and verified.", "CHALLENGE"],
+    ["System-level power management", "SoC power management is moving beyond single blocks toward cross-chip, multi-interface and heterogeneous coordination.", "FUTURE"],
+    ["Energy harvesting integration", "Future UPF flows may fold harvested-energy sources into power-state decisions for autonomous, energy-efficient IoT-class devices.", "FUTURE"],
+    ["Cross-disciplinary collaboration", "Power intent increasingly joins battery, thermal and system-architecture feedback so power decisions are made holistically.", "FUTURE"],
+  ].forEach(([t, d, kind]) => html += `<div class="ilink"><span class="il-rule">${kind === "FUTURE" ? "→" : "△"}</span><span class="il-kind" style="color:${kind === "FUTURE" ? "var(--accent)" : "var(--warning)"}">${esc(kind)}</span><span class="il-a"><strong>${esc(t)}</strong> - ${esc(d)}</span></div>`);
+  html += `<p class="callout co-info"><span><strong>Where UPF-Insight fits</strong> - the tool verifies the static power-intent half of these challenges (domains, supplies, states, isolation, retention, level shifters, strategies). Simulation, formal verification and implementation signoff remain separate EDA domains.</span></p>`;
   return html + "</div>";
 }
 
 /* ── Test Drive ─────────────────────────────────────────────────────────── */
 export async function pageTestDrive() {
   let html = pageHead("TOOLS", "Test Drive",
-    "Run the real UPF-Insight pipeline on believable samples — clean, buggy, design-aware, and a full V1→V2 regression workflow.",
+    "Run the real UPF-Insight pipeline on believable samples - clean, buggy, design-aware, and a full V1→V2 regression workflow.",
     "Pick a scenario and press Analyze. Every result comes from the real backend, then follow the next actions.");
   html += `<div class="filters"><div class="f-field"><label>Scenario</label><select class="select-input" id="td-sample">
-    <option value="good">Clean UPF — known-good 3-domain SoC</option>
-    <option value="bad">Buggy UPF — undefined references</option>
-    <option value="design">Design-aware — with netlist snapshot</option>
-    <option value="regression">CPU regression — V1 known-good vs V2 regressed (validate → diff → gate)</option>
-  </select></div><button class="btn btn-primary" id="td-run" type="button">Analyze sample</button></div>
+    <option value="good">Clean UPF - known-good 3-domain SoC</option>
+    <option value="bad">Buggy UPF - undefined references</option>
+    <option value="design">Design-aware - with netlist snapshot</option>
+    <option value="regression">CPU regression - V1 known-good vs V2 regressed (validate → diff → gate)</option>
+  </select></div><button class="btn btn-primary" id="td-run" type="button">Analyze sample</button>
+  <button class="btn btn-sm" id="td-dl" type="button" disabled>Download results JSON</button></div>
   <div id="td-out"></div>`;
   return html + "</div>";
 }
@@ -897,10 +1107,20 @@ const GEN_GROUPS = {
   domains: {
     label: "Power domains", hint: "create_power_domain",
     fields: [
-      { k: "name", label: "Name", w: 120, ph: "core" },
-      { k: "elements", label: "Elements", w: 240, ph: "u_core u_ahb" },
+      { k: "name", label: "Name", w: 100, ph: "core" },
+      { k: "elements", label: "Elements", w: 200, ph: "u_core u_ahb" },
+      { k: "domain_type", label: "Type", w: 100, ph: "switchable" },
     ],
-    defaults: [["core", ""], ["io", ""], ["sram", ""]],
+    defaults: [["core", "u_core", "switchable"], ["io", "u_io", ""], ["sram", "u_sram", "always_on"]],
+  },
+  relations: {
+    label: "Domain relations", hint: "power-domain topology",
+    fields: [
+      { k: "from_domain", label: "From", w: 100, ph: "aon" },
+      { k: "to_domain", label: "To", w: 100, ph: "core" },
+      { k: "kinds", label: "Kinds", w: 220, ph: "switch,isolation,level_shift" },
+    ],
+    defaults: [["core", "io", "isolation,level_shift"], ["core", "sram", "isolation"]],
   },
   switches: {
     label: "Power switches", hint: "create_power_switch",
@@ -1002,64 +1222,53 @@ export function genFieldKeys(key) {
 
 export async function pageGenerator() {
   let html = pageHead("TOOLS", "UPF Generator",
-    "Build standard IEEE 1801 power-intent constructs — domains, supply switches, isolation, level shifters, retention, repeaters, PST states — into a reviewable UPF file.",
-    "Set parameters, press Generate, then Validate to check the emitted UPF in place.");
-  html += `<div class="gen-grid">
-    <div class="gen-params">
-      <div class="panel">
-        <div class="panel-head"><span class="gen-glabel">Design</span><span class="mono gen-hint">set_design_top</span></div>
-        <div class="gen-param-row">
-          <label class="opt-label">Design top</label>
-          <input class="opt-input gen-in" id="g-top" value="top" style="width:140px">
-          <label class="opt-label">UPF version</label>
-          <select class="opt-select gen-in" id="g-ver" style="width:80px">
-            <option>3.0</option><option>2.1</option><option>4.0</option>
-          </select>
-        </div>
-        <div class="gen-param-row">
-          <label class="opt-label">Power</label><input class="opt-input gen-in" id="g-pp" value="vdd" style="width:80px">
-          <label class="opt-label">Ground</label><input class="opt-input gen-in" id="g-pg" value="vss" style="width:80px">
-          <label class="opt-label">On V</label><input class="opt-input gen-in" id="g-onv" value="1.0" style="width:60px">
-          <label class="opt-label">Off V</label><input class="opt-input gen-in" id="g-offv" value="0.0" style="width:60px">
-        </div>
-      </div>
-      ${genGroupPanelHtml("domains")}
-      ${genGroupPanelHtml("switches")}
-      ${genGroupPanelHtml("isolation")}
-      ${genGroupPanelHtml("level_shifters")}
-      ${genGroupPanelHtml("retention")}
-      ${genGroupPanelHtml("repeaters")}
-      ${genGroupPanelHtml("pst_states")}
-      <div class="panel">
-        <div class="panel-head"><span class="gen-glabel">Always-on signals</span><span class="mono gen-hint">set_port_attributes</span></div>
-        <input class="opt-input gen-in" id="g-aon" value="clk, rst" style="width:100%">
-      </div>
+    "Generate an IEEE 1801 power-intent file from parameters - domains, switches, isolation, level shifters, retention, repeaters and power states.",
+    "Set the parameters, press Generate, then Validate the emitted UPF in place.");
+  html += `<div class="input-surface">
+    <div class="optional-panel" style="grid-template-columns:repeat(4,1fr)">
+      <div><label class="opt-label" for="g-arch">Architecture</label><select class="opt-select" id="g-arch">
+        <option value="flat">Flat</option><option value="hierarchical">Hierarchical</option></select></div>
+      <div><label class="opt-label" for="g-hier">Hierarchy scopes</label><input class="opt-input" id="g-hier" value="" placeholder="core_a, core_b"></div>
+      <div><label class="opt-label" for="g-top">Design top</label><input class="opt-input" id="g-top" value="top"></div>
+      <div><label class="opt-label" for="g-ver">UPF version</label><select class="opt-select" id="g-ver">
+        <option>3.0</option><option>2.1</option><option>4.0</option></select></div>
+      <div><label class="opt-label" for="g-pp">Primary power</label><input class="opt-input" id="g-pp" value="vdd"></div>
+      <div><label class="opt-label" for="g-pg">Primary ground</label><input class="opt-input" id="g-pg" value="vss"></div>
+      <div><label class="opt-label" for="g-onv">On voltage (V)</label><input class="opt-input" id="g-onv" value="1.0"></div>
+      <div><label class="opt-label" for="g-offv">Off voltage (V)</label><input class="opt-input" id="g-offv" value="0.0"></div>
+      <div style="grid-column:1/-1"><label class="opt-label" for="g-aon">Always-on signals (comma-separated)</label><input class="opt-input" id="g-aon" value="clk, rst" style="width:100%"></div>
     </div>
-    <div class="gen-out">
-      <div class="toolbar">
-        <button class="btn btn-primary btn-sm" id="g-gen" type="button">Generate</button>
-        <button class="btn btn-sm" id="g-validate" type="button">Validate</button>
-        <button class="btn btn-sm" id="g-copy" type="button">Copy</button>
-        <button class="btn btn-sm" id="g-dl" type="button">Download .upf</button>
-        <span class="mono gen-status" id="g-status"></span>
-      </div>
-      <div id="g-out"></div>
-      <div id="g-val"></div>
+    ${genGroupPanelHtml("domains")}
+    ${genGroupPanelHtml("relations")}
+    ${genGroupPanelHtml("switches")}
+    ${genGroupPanelHtml("isolation")}
+    ${genGroupPanelHtml("level_shifters")}
+    ${genGroupPanelHtml("retention")}
+    ${genGroupPanelHtml("repeaters")}
+    ${genGroupPanelHtml("pst_states")}
+    <div style="padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border-subtle)">
+      <button class="btn btn-primary" id="g-gen" type="button">Generate</button>
+      <button class="btn" id="g-validate" type="button">Validate</button>
+      <button class="btn btn-sm" id="g-copy" type="button">Copy</button>
+      <button class="btn btn-sm" id="g-dl" type="button">Download .upf</button>
+      <span class="mono gen-status" id="g-status"></span>
     </div>
-  </div>`;
+  </div>
+  <div id="g-out"></div>
+  <div id="g-val"></div>`;
   return html + "</div>";
 }
 
 /* ── UPF Diff (semantic, V1 vs V2) ──────────────────────────────────────── */
 export async function pageDiff() {
   let html = pageHead("ADVANCED", "UPF Diff",
-    "Compare two UPF power-intent files semantically — domains, supplies, switches, strategies and PST changes, not raw text.",
+    "Compare two UPF power-intent files semantically - domains, supplies, switches, strategies and PST changes, not raw text.",
     "Paste Version A and Version B, then Compare. Identical semantics produce zero changes.");
   html += `<div class="input-surface entry">
     <div class="entry-step">
       <div class="es-num">1</div>
       <div class="es-main">
-        <div class="es-head"><span class="es-title">Version A — reference UPF</span><span class="es-req">REQUIRED</span></div>
+        <div class="es-head"><span class="es-title">Version A - reference UPF</span><span class="es-req">REQUIRED</span></div>
         <div class="es-actions">
           <button class="btn btn-sm" id="df-pick-a" type="button">Choose file…</button>
           <button class="btn btn-sm btn-ghost" id="df-sample-a" type="button">Load sample V1</button>
@@ -1071,7 +1280,7 @@ export async function pageDiff() {
     <div class="entry-step">
       <div class="es-num">2</div>
       <div class="es-main">
-        <div class="es-head"><span class="es-title">Version B — candidate UPF</span><span class="es-req">REQUIRED</span></div>
+        <div class="es-head"><span class="es-title">Version B - candidate UPF</span><span class="es-req">REQUIRED</span></div>
         <div class="es-actions">
           <button class="btn btn-sm" id="df-pick-b" type="button">Choose file…</button>
           <button class="btn btn-sm btn-ghost" id="df-sample-b" type="button">Load sample V2</button>
@@ -1092,7 +1301,7 @@ export async function pageDiff() {
 /* ── CI Gate (policy evaluation) ────────────────────────────────────────── */
 export async function pageGate() {
   let html = pageHead("ADVANCED", "CI Gate",
-    "Gate a power-intent change against a policy — the same evaluation the CLI runs in CI, with PASS/FAIL, reasons and an exit code.",
+    "Gate a power-intent change against a policy - the same evaluation the CLI runs in CI, with PASS/FAIL, reasons and an exit code.",
     "Paste the candidate UPF, choose a policy, optionally supply a baseline, then Run Gate.");
   html += `<div class="input-surface entry">
     <div class="entry-step">
@@ -1114,9 +1323,9 @@ export async function pageGate() {
         <div class="es-head"><span class="es-title">Policy</span><span class="es-req">REQUIRED</span></div>
         <div class="filters" style="margin:0">
           <div class="f-field"><select class="select-input" id="gt-policy">
-            <option value="BLOCKERS_ONLY">BLOCKERS_ONLY — fail on current blockers</option>
-            <option value="NO_READINESS_REGRESSION">NO_READINESS_REGRESSION — fail on new blockers or trust regression vs baseline</option>
-            <option value="STRICT" selected>STRICT — fail on blockers, review items, trust and coverage regressions</option>
+            <option value="BLOCKERS_ONLY">BLOCKERS_ONLY - fail on current blockers</option>
+            <option value="NO_READINESS_REGRESSION">NO_READINESS_REGRESSION - fail on new blockers or trust regression vs baseline</option>
+            <option value="STRICT" selected>STRICT - fail on blockers, review items, trust and coverage regressions</option>
           </select></div>
         </div>
       </div>
@@ -1125,11 +1334,11 @@ export async function pageGate() {
       <div class="es-num">3</div>
       <div class="es-main">
         <div class="es-head"><span class="es-title">Baseline (optional)</span><span class="es-opt">OPTIONAL</span></div>
-        <p class="es-why">Optional — without a baseline the gate evaluates the current evidence only. Paste a saved result JSON, or run against the current analysis as baseline.</p>
+        <p class="es-why">Optional - without a baseline the gate evaluates the current evidence only. Paste a saved result JSON, or run against the current analysis as baseline.</p>
         <div class="es-actions">
           <button class="btn btn-sm btn-ghost" id="gt-base-current" type="button">Set baseline = current analysis</button>
         </div>
-        <textarea class="opt-text" id="gt-baseline" rows="3" spellcheck="false" placeholder='{"check": {...}, "readiness": {...}, ...} — a saved result'></textarea>
+        <textarea class="opt-text" id="gt-baseline" rows="3" spellcheck="false" placeholder='{"check": {...}, "readiness": {...}, ...} - a saved result'></textarea>
       </div>
     </div>
   </div>
@@ -1144,7 +1353,7 @@ export async function pageGate() {
 /* ── Reports (real evidence) ────────────────────────────────────────────── */
 export async function pageReports() {
   let html = pageHead("OUTPUT & KNOWLEDGE", "Reports",
-    "Generate reports from real analysis evidence — findings, rule IDs, source lines, readiness, coverage and the support boundary.",
+    "Generate reports from real analysis evidence - findings, rule IDs, source lines, readiness, coverage and the support boundary.",
     "Paste UPF, choose a format, then Generate. Reports contain real engine output, never placeholders.");
   html += `<div class="input-surface entry">
     <div class="entry-step">
@@ -1172,9 +1381,9 @@ export async function pageReports() {
         <div class="es-head"><span class="es-title">Format</span><span class="es-req">REQUIRED</span></div>
         <div class="filters" style="margin:0">
           <div class="f-field"><select class="select-input" id="rp-format">
-            <option value="html" selected>HTML — human-readable report</option>
-            <option value="json">JSON — machine-readable evidence</option>
-            <option value="text">Text — terminal-friendly</option>
+            <option value="html" selected>HTML - human-readable report</option>
+            <option value="json">JSON - machine-readable evidence</option>
+            <option value="text">Text - terminal-friendly</option>
           </select></div>
         </div>
       </div>
@@ -1192,32 +1401,34 @@ export async function pageReports() {
    Page registry + event wiring
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* One canonical feature order everywhere (home cards, nav, palette):
+   CORE → ANALYZE → ADVANCED → OUTPUT/KNOWLEDGE. Every feature owns its
+   input surface and is always visible - standalone first. */
 export const PAGES = {
-  // WORKSPACE — always available; every tool owns its input surface.
   home: { label: "Home", render: pageHome, group: "WORKSPACE" },
   new_analysis: { label: "New Analysis", render: pageNewAnalysis, group: "WORKSPACE" },
-  validator: { label: "Validation", render: pageValidator, group: "WORKSPACE" },
-  generator: { label: "Generator", render: pageGenerator, group: "WORKSPACE" },
-  diff: { label: "UPF Diff", render: pageDiff, group: "WORKSPACE" },
-  gate: { label: "CI Gate", render: pageGate, group: "WORKSPACE" },
-  reports: { label: "Reports", render: pageReports, group: "WORKSPACE" },
-  test_drive: { label: "Test Drive", render: pageTestDrive, group: "WORKSPACE" },
-  rules: { label: "Rules", render: pageRules, group: "WORKSPACE" },
-  trust: { label: "Trust", render: pageTrust, group: "WORKSPACE" },
-  documentation: { label: "Documentation", render: pageDocumentation, group: "WORKSPACE" },
-  // RESULTS — analysis-result views, shown once an analysis exists.
+  validator: { label: "Validation", render: pageValidator, group: "CORE" },
+  generator: { label: "Generator", render: pageGenerator, group: "CORE" },
+  pst: { label: "Power States", render: pagePST, group: "ANALYZE" },
+  supply: { label: "Supply Network", render: pageSupply, group: "ANALYZE" },
+  strategies: { label: "Strategies", render: pageStrategies, group: "ANALYZE" },
+  relations: { label: "Domain Relations", render: pageRelations, group: "ANALYZE" },
+  design: { label: "Design", render: pageDesign, group: "ANALYZE" },
+  coverage: { label: "Coverage", render: pageCoverage, group: "ANALYZE" },
+  readiness: { label: "Health", render: pageReadiness, group: "ANALYZE" },
+  diff: { label: "UPF Diff", render: pageDiff, group: "ADVANCED" },
+  gate: { label: "CI Gate", render: pageGate, group: "ADVANCED" },
+  test_drive: { label: "Test Drive", render: pageTestDrive, group: "ADVANCED" },
+  reports: { label: "Reports", render: pageReports, group: "OUTPUT" },
+  rules: { label: "Rules", render: pageRules, group: "OUTPUT" },
+  trust: { label: "Trust", render: pageTrust, group: "OUTPUT" },
+  documentation: { label: "Documentation", render: pageDocumentation, group: "OUTPUT" },
   overview: { label: "Summary", render: pageOverview, group: "RESULTS" },
-  supply: { label: "Supply Network", render: pageSupply, group: "RESULTS" },
-  pst: { label: "Power States", render: pagePST, group: "RESULTS" },
-  strategies: { label: "Strategies", render: pageStrategies, group: "RESULTS" },
-  design: { label: "Design", render: pageDesign, group: "RESULTS" },
-  coverage: { label: "Coverage", render: pageCoverage, group: "RESULTS" },
-  readiness: { label: "Health", render: pageReadiness, group: "RESULTS" },
   support: { label: "Support", render: pageSupport, group: "RESULTS" },
   export: { label: "Export", render: pageExport, group: "RESULTS" },
 };
 
-const GROUP_ORDER = ["WORKSPACE", "RESULTS"];
+const GROUP_ORDER = ["WORKSPACE", "CORE", "ANALYZE", "ADVANCED", "OUTPUT", "RESULTS"];
 
 function navItemHtml(view, label, current) {
   const active = view === current ? " active" : "";
@@ -1233,9 +1444,8 @@ export function navGroupsHtml(current) {
   });
   return GROUP_ORDER.map(group => {
     const items = byGroup[group] || [];
-    if (group === "RESULTS" && !App.state.analysis) return "";
-    const label = group === "RESULTS" && !App.state.analysis ? "" : group;
-    return `<div class="nav-group"><span class="nav-group-label">${label}</span>${items.map(([id, l]) => navItemHtml(id, l, current)).join("")}</div>`;
+    if (!items.length) return "";
+    return `<div class="nav-group"><span class="nav-group-label">${group}</span>${items.map(([id, l]) => navItemHtml(id, l, current)).join("")}</div>`;
   }).join("");
 }
 

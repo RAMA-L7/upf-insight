@@ -1,4 +1,4 @@
-"""Core engine tests — preprocess, build, check, support boundary, PST."""
+"""Core engine tests - preprocess, build, check, support boundary, PST."""
 
 import pytest
 

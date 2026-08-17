@@ -1,9 +1,9 @@
-# cpu_subsys_v2.upf — realistic CPU-subsystem power intent (REGRESSED).
+# cpu_subsys_v2.upf - realistic CPU-subsystem power intent (REGRESSED).
 #
 # Identical to V1 except ONE subtle, realistic defect: the level shifter on
 # the 1.8 V I/O boundary has been removed (an engineer "simplified" the
 # crossing during a refactor). The CPU (1.0 V) and I/O (1.8 V) domains now
-# cross voltage domains with no level shifter — UPF-061 must fire.
+# cross voltage domains with no level shifter - UPF-061 must fire.
 #
 # Do NOT reveal this planted regression in the user-facing Test Drive.
 upf_version 3.0

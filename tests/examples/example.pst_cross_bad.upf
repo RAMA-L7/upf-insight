@@ -1,9 +1,9 @@
-# example.pst_cross_bad.upf — PST cross-state transition legality fixture.
+# example.pst_cross_bad.upf - PST cross-state transition legality fixture.
 #
 # Exercises the strict cross-state rules:
-#   * UPF-037 — DRV is switchable and powers down (S_ON -> S_OFF) while the
+#   * UPF-037 - DRV is switchable and powers down (S_ON -> S_OFF) while the
 #               always-on RCV domain stays ON; DRV has no isolation/clamp.
-#   * UPF-038 — DRV2's power net (vdd_sw2, a power-switch output) never appears
+#   * UPF-038 - DRV2's power net (vdd_sw2, a power-switch output) never appears
 #               in any PST row, so its tri-state/floating behavior is unverifiable.
 upf_version 3.0
 set_design_top x_top

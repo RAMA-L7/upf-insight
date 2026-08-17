@@ -36,7 +36,7 @@ def test_identical_semantics_no_changes():
 
 
 def test_comment_only_edit_is_not_a_change():
-    # Prepending comments shifts every declared_line — provenance, not
+    # Prepending comments shifts every declared_line - provenance, not
     # semantics. The diff must stay empty.
     edited = "# a comment\\n# another comment\\n" + BASE
     assert diff_models(_model(BASE), _model(edited)) == []

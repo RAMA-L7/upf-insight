@@ -1,4 +1,4 @@
-# example.sw_bad.upf — golden fixture exercising the power-switch rule family.
+# example.sw_bad.upf - golden fixture exercising the power-switch rule family.
 upf_version 3.0
 set_design_top sw_top
 

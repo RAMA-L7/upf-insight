@@ -1,4 +1,4 @@
-# example.broken.upf — deliberately faulty UPF for exercising the rule engine.
+# example.broken.upf - deliberately faulty UPF for exercising the rule engine.
 upf_version 3.0
 set_design_top soc_top
 

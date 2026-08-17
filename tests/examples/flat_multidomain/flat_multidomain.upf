@@ -1,0 +1,83 @@
+# Flat multi-domain power intent: AON + A/B/C switchable + SRAM
+# Generated-style fixture exercising the full relation graph:
+# switch, isolation, level shift, retention and supply sharing.
+upf_version 3.0
+set_design_top top
+
+# -- Power domains ---------------------------------------------------------
+create_power_domain PD_AON -elements {u_aon}
+set_port_attributes PD_AON -attribute {always_on true}
+create_power_domain PD_A -elements {u_a}
+create_power_domain PD_B -elements {u_b}
+create_power_domain PD_C -elements {u_c}
+create_power_domain PD_SRAM -elements {u_sram}
+set_port_attributes PD_SRAM -attribute {always_on true}
+
+# -- Supply network ---------------------------------------------------------
+create_supply_port vdd_aon -direction in
+create_supply_net vdd_aon -resolve port
+connect_supply_net vdd_aon -ports vdd_aon
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+create_supply_net vdd_a_sw -resolve net
+connect_supply_net vdd_a_sw -ports vdd_aon
+create_supply_net vdd_b_sw -resolve net
+connect_supply_net vdd_b_sw -ports vdd_aon
+create_supply_net vdd_c_sw -resolve net
+connect_supply_net vdd_c_sw -ports vdd_aon
+create_supply_net vdd_mem -resolve net
+connect_supply_net vdd_mem -ports vdd_aon
+
+set_domain_supply_net PD_AON -primary_power_net vdd_aon -primary_ground_net vss
+set_domain_supply_net PD_A -primary_power_net vdd_a_sw -primary_ground_net vss
+set_domain_supply_net PD_B -primary_power_net vdd_b_sw -primary_ground_net vss
+set_domain_supply_net PD_C -primary_power_net vdd_c_sw -primary_ground_net vss
+set_domain_supply_net PD_SRAM -primary_power_net vdd_mem -primary_ground_net vss
+
+# -- Power switches ---------------------------------------------------------
+create_power_switch PSW_A -input_supply_port vdd_aon -output_supply_port vdd_a_sw \
+  -control_port a_pwr_en -on_state {on {vdd_aon} {a_pwr_en}} -off_state {off {vdd_aon} {!a_pwr_en}}
+create_power_switch PSW_B -input_supply_port vdd_aon -output_supply_port vdd_b_sw \
+  -control_port b_pwr_en -on_state {on {vdd_aon} {b_pwr_en}} -off_state {off {vdd_aon} {!b_pwr_en}}
+create_power_switch PSW_C -input_supply_port vdd_aon -output_supply_port vdd_c_sw \
+  -control_port c_pwr_en -on_state {on {vdd_aon} {c_pwr_en}} -off_state {off {vdd_aon} {!c_pwr_en}}
+
+# -- Isolation ---------------------------------------------------------
+set_isolation iso_A_to_SRAM -domain PD_A -isolation_supply vdd_aon -clamp_value 1 \
+  -isolation_signal iso_a_en -location parent
+set_isolation iso_B_to_SRAM -domain PD_B -isolation_supply vdd_aon -clamp_value 1 \
+  -isolation_signal iso_b_en -location parent
+set_isolation iso_C_to_SRAM -domain PD_C -isolation_supply vdd_aon -clamp_value 1 \
+  -isolation_signal iso_c_en -location parent
+
+# -- Level shifters ---------------------------------------------------------
+set_level_shifter ls_A -domain PD_A -location parent -rule both
+set_level_shifter ls_B -domain PD_B -location parent -rule both
+set_level_shifter ls_C -domain PD_C -location parent -rule both
+
+# -- Retention ---------------------------------------------------------
+create_supply_set retention -function {power vdd_aon} -function {ground vss}
+set_retention ret_A -domain PD_A -retention_supply retention -save_signal save_a -restore_signal restore_a
+set_retention ret_B -domain PD_B -retention_supply retention -save_signal save_b -restore_signal restore_b
+
+# -- Power states / PST ---------------------------------------------------------
+# always-on supplies stay ON in every PST row, so only their ON state is
+# declared; switched nets carry explicit OFF states used by the PST rows.
+add_port_state vdd_aon -state {ON 1.0}
+add_port_state vss -state {ON 0.0}
+add_port_state vdd_mem -state {ON 1.0}
+add_port_state vdd_a_sw -state {ON 1.0} -state {OFF 0.0}
+add_port_state vdd_b_sw -state {ON 1.0} -state {OFF 0.0}
+add_port_state vdd_c_sw -state {ON 1.0} -state {OFF 0.0}
+
+create_pst pst_top -supplies {vdd_aon vss vdd_a_sw vdd_b_sw vdd_c_sw vdd_mem}
+add_pst_state ALL_ON -pst pst_top \
+  -state {vdd_aon ON vss ON vdd_a_sw ON vdd_b_sw ON vdd_c_sw ON vdd_mem ON}
+add_pst_state A_OFF -pst pst_top \
+  -state {vdd_aon ON vss ON vdd_a_sw OFF vdd_b_sw ON vdd_c_sw ON vdd_mem ON}
+add_pst_state B_OFF -pst pst_top \
+  -state {vdd_aon ON vss ON vdd_a_sw ON vdd_b_sw OFF vdd_c_sw ON vdd_mem ON}
+add_pst_state C_OFF -pst pst_top \
+  -state {vdd_aon ON vss ON vdd_a_sw ON vdd_b_sw ON vdd_c_sw OFF vdd_mem ON}

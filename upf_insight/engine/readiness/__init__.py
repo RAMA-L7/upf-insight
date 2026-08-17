@@ -1,4 +1,4 @@
-"""Power-intent readiness — categorical verdict for a validated UPF model."""
+"""Power-intent readiness - categorical verdict for a validated UPF model."""
 
 from .readiness import (
     READY,

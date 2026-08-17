@@ -63,6 +63,8 @@ _SUPPORTED = {
 # Legal options per supported command (UPF 2.1/3.0 grammar). Used by UPF-002.
 _LEGAL_OPTIONS = {
     "create_power_domain": {"-elements", "-primary_supply_set", "-supply", "-update"},
+    "set_scope": set(),
+    "load_upf": {"-scope", "-supply", "-update"},
     "create_supply_net": {"-resolve", "-update"},
     "create_supply_port": {"-direction", "-domain", "-update"},
     "create_supply_set": {"-function", "-power", "-ground", "-update"},
@@ -201,6 +203,10 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
         files = model.record_files.setdefault(rec.line, [])
         if rec.file not in files:
             files.append(rec.file)
+        if rec.file:
+            import os as _os
+
+            model.record_file_names.add(_os.path.basename(rec.file))
         try:
             tokens = _tokenize(rec)
         except Exception:
@@ -253,7 +259,7 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
     line = rec.line
     text = rec.text
 
-    # UPF-006 — unbalanced braces / brackets / unterminated quote.
+    # UPF-006 - unbalanced braces / brackets / unterminated quote.
     balance = {"{": 0, "[": 0, '"': 0}
     for ch in text:
         if ch in balance:
@@ -269,7 +275,7 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
                        f"'{cmd}' (balance {balance}).",
         })
 
-    # UPF-002 — illegal option.
+    # UPF-002 - illegal option.
     legal = _LEGAL_OPTIONS.get(cmd, set())
     for tok in tokens[1:]:
         if tok.startswith("-") and tok not in legal and not tok[1:2].isdigit():
@@ -278,7 +284,7 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
                 "message": f"Illegal option '{tok}' for command '{cmd}'.",
             })
 
-    # UPF-003 — missing required argument.
+    # UPF-003 - missing required argument.
     for opt in _REQUIRED_OPTIONS.get(cmd, ()):
         if opt not in tokens:
             model.syntax_issues.append({
@@ -287,7 +293,7 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
                            f"'{cmd}'.",
             })
 
-    # UPF-004 — unsupported version.
+    # UPF-004 - unsupported version.
     if cmd == "upf_version":
         version = tokens[1] if len(tokens) > 1 else ""
         if version not in _SUPPORTED_VERSIONS:
@@ -297,7 +303,7 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
                            f"supported (supported: {', '.join(_SUPPORTED_VERSIONS)}).",
             })
 
-    # UPF-005 — deprecated legacy syntax.
+    # UPF-005 - deprecated legacy syntax.
     if cmd in _DEPRECATED_FORMS:
         model.syntax_issues.append({
             "rule": "UPF-005", "support": "VALIDATED", "line": line,
@@ -329,7 +335,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         name = args[0] if args else "?"
         scope = model.current_scope
         elements = _get_opt(args, "-elements", "")
-        dom = PowerDomain(name=name, scope=scope, declared_line=line)
+        dom = PowerDomain(name=name, scope=scope, declared_line=line,
+                          declared_file=rec.file)
         if elements:
             cleaned = elements.strip().strip("{}")
             dom.elements = [e.strip() for e in cleaned.split() if e.strip()]
@@ -348,7 +355,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         model.domains[model.scope_key(name, scope)] = dom
     elif cmd == "create_supply_net":
         name = args[0] if args else "?"
-        net = SupplyNet(name=name, scope=model.current_scope, declared_line=line)
+        net = SupplyNet(name=name, scope=model.current_scope, declared_line=line,
+                        declared_file=rec.file)
         net.connected_to = []
         _track_definition(model, "net", name, line)
         model.supply_nets[model.scope_key(name, model.current_scope)] = net
@@ -357,7 +365,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         direction = _get_opt(args, "-direction", "inout")
         _track_definition(model, "port", name, line)
         model.supply_ports[model.scope_key(name, model.current_scope)] = SupplyPort(
-            name=name, scope=model.current_scope, direction=direction, declared_line=line
+            name=name, scope=model.current_scope, direction=direction, declared_line=line,
+            declared_file=rec.file
         )
     elif cmd == "create_supply_set":
         name = args[0] if args else "?"
@@ -375,7 +384,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 _track_reference(model, "supply", val, line)
         _track_definition(model, "set", name, line)
         model.supply_sets[model.scope_key(name, model.current_scope)] = SupplySet(
-            name=name, scope=model.current_scope, functions=funcs, declared_line=line
+            name=name, scope=model.current_scope, functions=funcs, declared_line=line,
+            declared_file=rec.file
         )
     elif cmd == "connect_supply_net":
         net = args[0] if args else None
@@ -384,7 +394,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             key = model.scope_key(net, model.current_scope)
             entry = model.supply_nets.get(key)
             if entry is None:
-                entry = SupplyNet(name=net, scope=model.current_scope, declared_line=line)
+                entry = SupplyNet(name=net, scope=model.current_scope, declared_line=line,
+                                  declared_file=rec.file)
                 model.supply_nets[key] = entry
             if target:
                 for t in _split_opt(args, "-ports") or _split_opt(args, "-nets"):
@@ -406,6 +417,7 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             on_state_condition=on_cond,
             off_state_condition=off_cond,
             declared_line=line,
+            declared_file=rec.file,
         )
         for opt in ("-input_supply_port", "-output_supply_port"):
             v = _get_opt(args, opt)
@@ -457,6 +469,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 control_signal=_get_opt(args, "-isolation_signal"),
                 applies_to=_get_opt(args, "-applies_to", "outputs"),
                 declared_line=line,
+                declared_file=rec.file,
+                scope=model.current_scope,
             )
         )
     elif cmd == "set_level_shifter":
@@ -473,6 +487,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 rule=_get_opt(args, "-rule", "low_to_high"),
                 applies_to=_get_opt(args, "-applies_to", ""),
                 declared_line=line,
+                declared_file=rec.file,
+                scope=model.current_scope,
             )
         )
     elif cmd == "set_repeater":
@@ -492,6 +508,7 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 signal=_get_opt(args, "-repeater_signal"),
                 isolation_supply=_get_opt(args, "-repeater_isolation_supply"),
                 declared_line=line,
+                declared_file=rec.file,
             )
         )
     elif cmd == "set_retention":
@@ -507,6 +524,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 save_signal=_get_opt(args, "-save_signal"),
                 restore_signal=_get_opt(args, "-restore_signal"),
                 declared_line=line,
+                declared_file=rec.file,
+                scope=model.current_scope,
             )
         )
     # add_port_state / add_supply_state / add_power_state / add_state_transition
@@ -536,8 +555,34 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             for pst in model.psts.values():
                 pst.transitions.append((src, dst))
     # load_upf is followed in load order; nested loads recorded for scoping.
+    # The loaded file name and any -supply mapping (local supply -> parent
+    # supply) are recorded so hierarchical ownership and supply maps resolve.
     elif cmd == "load_upf":
-        model.load_upf_events.append({"scope": model.current_scope, "line": line})
+        loaded = args[0] if args else None
+        # -scope gives the scope the child UPF is loaded INTO; the -supply
+        # mapping pairs the child's local supply with a supply in the parent
+        # scope (the scope load_upf executes in). References are therefore
+        # keyed to the parent scope, not the child scope, so the parent supply
+        # resolves and the mapping is traceable.
+        parent_scope = model.current_scope
+        child_scope = _get_opt(args, "-scope", parent_scope) or parent_scope
+        ev = {"scope": parent_scope, "line": line, "file": rec.file,
+              "loaded": loaded, "child_scope": child_scope}
+        for i, a in enumerate(args):
+            if a == "-supply" and i + 1 < len(args):
+                pair = _split_pair(args[i + 1])
+                if len(pair) == 2:
+                    ev["supply_map"] = {"local": pair[0], "parent": pair[1]}
+                    model.supply_maps.append({
+                        "scope": parent_scope,
+                        "local_scope": child_scope,
+                        "local": pair[0], "parent": pair[1], "line": line,
+                        "file": rec.file,
+                    })
+                    # The parent supply must exist in the parent scope; the
+                    # local supply is defined by the child UPF itself.
+                    _track_reference(model, "supply", pair[1], line)
+        model.load_upf_events.append(ev)
     elif cmd == "set_isolation_control":
         domain = _get_opt(args, "-domain") or ""
         ctl = model.isolation_controls.setdefault(domain, {})

@@ -1,4 +1,4 @@
-# example.iso_bad.upf — golden fixture exercising the isolation rule family.
+# example.iso_bad.upf - golden fixture exercising the isolation rule family.
 # One power switch makes vdd_sw switchable; a second domain is always-on.
 upf_version 3.0
 set_design_top iso_top

@@ -1,4 +1,4 @@
-"""Finding — the shared validation-finding data type.
+"""Finding - the shared validation-finding data type.
 
 Defined in its own module to break the import cycle between the checker
 (which dispatches) and the rule implementations (which produce findings).

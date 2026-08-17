@@ -1,4 +1,4 @@
-# example.design_bad.upf — fixture exercising the design-aware layer (UPF-080..084).
+# example.design_bad.upf - fixture exercising the design-aware layer (UPF-080..084).
 # Must be validated with --netlist tests/examples/example.design.json.
 upf_version 3.0
 set_design_top soc_top

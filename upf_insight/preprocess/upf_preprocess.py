@@ -1,4 +1,4 @@
-"""UPF preprocessing — Tcl lexical preprocessing for IEEE 1801 (UPF) files.
+"""UPF preprocessing - Tcl lexical preprocessing for IEEE 1801 (UPF) files.
 
 UPF is a Tcl dialect. This module strips comments, joins line continuations,
 preserves command boundaries, and emits clean command records suitable for the

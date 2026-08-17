@@ -1,4 +1,4 @@
-"""UPF rule implementations — deterministic handlers keyed by rule code.
+"""UPF rule implementations - deterministic handlers keyed by rule code.
 
 Each handler takes a PowerIntentModel and returns a list of Finding. Handlers
 are registered in RULE_HANDLERS; the checker dispatches registered rules to
@@ -27,8 +27,25 @@ def _register(code: str):
     return deco
 
 
-def _supply_lookup(model: PowerIntentModel, name: str):
-    """Resolve a supply name to (net|set|port, scope) if it exists."""
+def _supply_lookup(model: PowerIntentModel, name: str,
+                   scope: Optional[str] = None):
+    """Resolve a supply name to (net|set|port, scope) if it exists.
+
+    ``scope`` is the scope the reference appears in (a strategy's declared
+    scope); the name is resolved as ``<scope>/<name>`` first so child-scoped
+    supplies like ``core_a/vdd_core_sw`` resolve to their own scope even
+    when the model's current scope points elsewhere at rule time. Falls back
+    to the model's current scope, then to a bare-name match."""
+    for sc in (scope, model.current_scope):
+        if not sc or sc in (".", ""):
+            continue
+        key = model.scope_key(name, sc)
+        if key in model.supply_nets:
+            return "net", key
+        if key in model.supply_sets:
+            return "set", key
+        if key in model.supply_ports:
+            return "port", key
     key = model.scope_key(name, model.current_scope)
     if key in model.supply_nets:
         return "net", key
@@ -45,7 +62,7 @@ def _supply_lookup(model: PowerIntentModel, name: str):
 
 
 # ---------------------------------------------------------------------------
-# Layer 1 — Syntax
+# Layer 1 - Syntax
 # ---------------------------------------------------------------------------
 
 @_register("UPF-001")
@@ -104,7 +121,7 @@ def _malformed_tcl(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 3 — Supply & domain integrity
+# Layer 3 - Supply & domain integrity
 # ---------------------------------------------------------------------------
 
 @_register("UPF-020")
@@ -207,7 +224,7 @@ def _unused_supply_state(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 4 — PST
+# Layer 4 - PST
 # ---------------------------------------------------------------------------
 
 def _declared_supply_states(model: PowerIntentModel) -> Dict[str, set]:
@@ -288,7 +305,7 @@ def _empty_or_unreachable_pst_state(model: PowerIntentModel):
                 findings.append(Finding(
                     rule="UPF-033", severity="warning",
                     message=f"PST '{pst.name}' state '{state.name}' has no "
-                            f"supply bindings — covers no legal power "
+                            f"supply bindings - covers no legal power "
                             f"combination.",
                     line=state.declared_line))
         # Reachability: a state with no incoming transition and no self-loop
@@ -306,7 +323,7 @@ def _empty_or_unreachable_pst_state(model: PowerIntentModel):
                     findings.append(Finding(
                         rule="UPF-033", severity="warning",
                         message=f"PST '{pst.name}' state '{state.name}' is "
-                                f"unreachable — no transition targets it.",
+                                f"unreachable - no transition targets it.",
                         line=state.declared_line))
     return findings
 
@@ -423,7 +440,7 @@ def _switchable_net_not_modeled(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 5 — Strategies
+# Layer 5 - Strategies
 # ---------------------------------------------------------------------------
 
 def _switchable_outputs(model: PowerIntentModel) -> set:
@@ -476,12 +493,13 @@ def _isolation_non_always_on(model: PowerIntentModel):
     for iso in model.isolation:
         if not iso.isolation_supply:
             continue
-        kind, key = _supply_lookup(model, iso.isolation_supply)
+        kind, key = _supply_lookup(model, iso.isolation_supply,
+                                   getattr(iso, "scope", None))
         if kind is None:
             findings.append(Finding(
                 rule="UPF-040", severity="error",
                 message=f"Isolation for domain '{iso.domain}' uses unknown "
-                        f"isolation supply '{iso.isolation_supply}' — cannot be "
+                        f"isolation supply '{iso.isolation_supply}' - cannot be "
                         f"guaranteed always-on.",
                 line=iso.declared_line))
         else:
@@ -526,7 +544,7 @@ def _isolation_self_in_switchable(model: PowerIntentModel):
                 rule="UPF-041", severity="error",
                 message=f"Isolation for domain '{iso.domain}' is located 'self' "
                         f"but the domain's primary supply '{primary}' is "
-                        f"switchable — isolation cells would lose power.",
+                        f"switchable - isolation cells would lose power.",
                 line=iso.declared_line))
     return findings
 
@@ -549,7 +567,7 @@ def _missing_isolation_crossing(model: PowerIntentModel):
             findings.append(Finding(
                 rule="UPF-042", severity="warning",
                 message=f"Switchable domain '{dom.name}' has no isolation "
-                        f"strategy — crossings may leak; confirm against the "
+                        f"strategy - crossings may leak; confirm against the "
                         f"netlist.",
                 line=dom.declared_line, support="NETLIST_REQUIRED"))
     return findings
@@ -568,7 +586,7 @@ def _redundant_isolation(model: PowerIntentModel):
         if primary and primary not in switched:
             findings.append(Finding(
                 rule="UPF-043", severity="info",
-                message=f"Isolation on domain '{iso.domain}' is redundant — "
+                message=f"Isolation on domain '{iso.domain}' is redundant - "
                         f"primary supply '{primary}' is not switchable.",
                 line=iso.declared_line))
     return findings
@@ -630,7 +648,7 @@ def _invalid_clamp_value(model: PowerIntentModel):
         findings.append(Finding(
             rule="UPF-046", severity="error",
             message=f"Isolation for domain '{iso.domain}' uses clamp value "
-                    f"'{iso.clamp_value}' — must be 0, 1, or a declared supply "
+                    f"'{iso.clamp_value}' - must be 0, 1, or a declared supply "
                     f"state.",
             line=iso.declared_line))
     return findings
@@ -673,7 +691,8 @@ def _retention_supply_powers_down(model: PowerIntentModel):
     findings = []
     for ret in model.retentions:
         if ret.retention_supply:
-            kind, _ = _supply_lookup(model, ret.retention_supply)
+            kind, _ = _supply_lookup(model, ret.retention_supply,
+                                     getattr(ret, "scope", None))
             if kind is None:
                 findings.append(Finding(
                     rule="UPF-050", severity="error",
@@ -737,7 +756,7 @@ def _retention_control_tied_constant(model: PowerIntentModel):
             findings.append(Finding(
                 rule="UPF-053", severity="warning",
                 message=f"Retention for domain '{ret.domain}' ties save and "
-                        f"restore to the same signal '{ret.save_signal}' — "
+                        f"restore to the same signal '{ret.save_signal}' - "
                         f"the control can never sequence correctly.",
                 line=ret.declared_line, support="PARTIAL"))
     return findings
@@ -767,7 +786,7 @@ def _unnecessary_level_shifter(model: PowerIntentModel):
     """
     return [
         Finding(rule="UPF-060", severity="info",
-                message=f"Level shifter on domain '{ls.domain}' — verify the "
+                message=f"Level shifter on domain '{ls.domain}' - verify the "
                         f"source/target voltages differ; equal voltages need no "
                         f"shifter.",
                 line=ls.declared_line, support="PARTIAL")
@@ -895,7 +914,7 @@ def _ls_self_in_switchable(model: PowerIntentModel):
                 rule="UPF-063", severity="error",
                 message=f"Level shifter on domain '{ls.domain}' is located "
                         f"'self' but the domain's primary supply '{primary}' "
-                        f"is switchable — the shifter would lose power.",
+                        f"is switchable - the shifter would lose power.",
                 line=ls.declared_line))
     return findings
 
@@ -923,7 +942,7 @@ def _ls_control_not_always_on(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 5 — Power switches
+# Layer 5 - Power switches
 # ---------------------------------------------------------------------------
 
 def _switch_control_always_on(model: PowerIntentModel) -> set:
@@ -1037,7 +1056,7 @@ def _switch_state_condition_without_control(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 2 — Reference integrity (model-level)
+# Layer 2 - Reference integrity (model-level)
 # ---------------------------------------------------------------------------
 
 @_register("UPF-010")
@@ -1093,7 +1112,7 @@ def _invalid_scope_target(model: PowerIntentModel):
 
 @_register("UPF-012")
 def _undefined_instance(model: PowerIntentModel):
-    """Bad instance paths — deterministic subset only.
+    """Bad instance paths - deterministic subset only.
 
     Without a netlist the engine cannot resolve instance names, so most of this
     rule is deferred to a netlist-aware layer. A leading wildcard or an empty
@@ -1163,7 +1182,7 @@ def _undefined_domain_references(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 6 — Design-aware (UPF-080…084, requires a design context)
+# Layer 6 - Design-aware (UPF-080…084, requires a design context)
 # ---------------------------------------------------------------------------
 # These rules are silent unless the model carries a DesignContext (netlist
 # snapshot). Without it, the honest support boundary reports NETLIST_REQUIRED.
@@ -1274,7 +1293,7 @@ def _retention_coverage_gap(model: PowerIntentModel):
 
     Uses the design context to know which instances are sequential. A
     sequential instance is a retention gap when its domain is retention-worthy
-    — either it already has a retention strategy (then every sequential element
+    - either it already has a retention strategy (then every sequential element
     must be covered) or its primary supply is switchable (can power down).
     """
     design = _design(model)
@@ -1316,7 +1335,7 @@ def _library_pg_mismatch(model: PowerIntentModel):
 
     For each domain element whose module declares PG pins in the design
     context, the domain's primary power/ground must appear among them
-    (case-insensitive — PG pin names are conventionally uppercase).
+    (case-insensitive - PG pin names are conventionally uppercase).
     """
     design = _design(model)
     if design is None:
@@ -1342,7 +1361,7 @@ def _library_pg_mismatch(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Layer 5 — Repeater strategies (UPF-090…094)
+# Layer 5 - Repeater strategies (UPF-090…094)
 # ---------------------------------------------------------------------------
 
 def _repeater_always_on(model: PowerIntentModel) -> set:
@@ -1359,7 +1378,8 @@ def _repeater_supply_not_always_on(model: PowerIntentModel):
     for rep in model.repeaters:
         if not rep.repeater_supply:
             continue
-        kind, _ = _supply_lookup(model, rep.repeater_supply)
+        kind, _ = _supply_lookup(model, rep.repeater_supply,
+                                 getattr(rep, "scope", None))
         if kind is None:
             findings.append(Finding(
                 rule="UPF-090", severity="error",
@@ -1413,7 +1433,7 @@ def _repeater_self_in_switchable(model: PowerIntentModel):
                 rule="UPF-092", severity="error",
                 message=f"Repeater on domain '{rep.domain}' is located 'self' "
                         f"but the domain's primary supply '{primary}' is "
-                        f"switchable — the repeater would lose power.",
+                        f"switchable - the repeater would lose power.",
                 line=rep.declared_line))
     return findings
 
@@ -1444,7 +1464,7 @@ def _repeater_without_control(model: PowerIntentModel):
 
 
 # ---------------------------------------------------------------------------
-# Hierarchical UPF (UPF-095…097) — promotion/demotion + composition
+# Hierarchical UPF (UPF-095…097) - promotion/demotion + composition
 # ---------------------------------------------------------------------------
 
 @_register("UPF-095")
@@ -1513,6 +1533,55 @@ def _equivalent_supply_undefined(model: PowerIntentModel):
                     message=f"set_equivalent references undefined supply "
                             f"'{name}'.",
                     line=eq["line"]))
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical supply mapping (UPF-099) and load_upf provenance (UPF-100)
+# ---------------------------------------------------------------------------
+
+@_register("UPF-099")
+def _supply_map_reference_undefined(model: PowerIntentModel):
+    """Both sides of a load_upf -supply map must resolve to declared supplies.
+
+    The local side is declared in the child scope (which the loader is about
+    to compose); the parent side must already exist at the current scope.
+    Either side being unknown is a genuine reference error - never invented.
+    """
+    findings = []
+    known = set()
+    for table in (model.supply_nets, model.supply_sets, model.supply_ports):
+        known.update(obj.name for obj in table.values())
+    for m in model.supply_maps:
+        local = m.get("local")
+        parent = m.get("parent")
+        if not local or not parent:
+            continue
+        if local not in known or parent not in known:
+            findings.append(Finding(
+                rule="UPF-099", severity="error",
+                message=f"load_upf -supply maps '{local}' -> '{parent}' but one "
+                        f"side is not a declared supply (net/port/set).",
+                line=m.get("line")))
+    return findings
+
+
+@_register("UPF-100")
+def _loaded_upf_missing(model: PowerIntentModel):
+    """load_upf names a child UPF file; flag when the file is not part of the
+    validated input set (missing child = unresolved hierarchy)."""
+    findings = []
+    for ev in model.load_upf_events:
+        loaded = ev.get("loaded")
+        if not loaded:
+            continue
+        present = loaded in model.record_file_names
+        if not present:
+            findings.append(Finding(
+                rule="UPF-100", severity="warning",
+                message=f"load_upf references '{loaded}' which is not among the "
+                        f"validated input files - hierarchy is unresolved.",
+                line=ev.get("line")))
     return findings
 
 

@@ -192,8 +192,10 @@ class Handler(BaseHTTPRequestHandler):
                 LevelShifterParam,
                 RetentionParam,
                 RepeaterParam,
+                RelationParam,
                 PstStateParam,
                 generate_upf,
+                generate_project,
                 generate_skeleton,
             )
             if self.command == "POST":
@@ -219,6 +221,22 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     if raw.get("pst_states"):
                         params.pst_states = [PstStateParam(**s) for s in raw["pst_states"]]
+                    params.relations = [
+                        RelationParam(from_domain=r.get("from_domain", ""),
+                                      to_domain=r.get("to_domain", ""),
+                                      kinds=r.get("kinds", "isolation"))
+                        for r in raw.get("relations", [])
+                    ]
+                    params.architecture = raw.get("architecture", "flat")
+                    params.hierarchy = [str(h) for h in raw.get("hierarchy", [])]
+                    if params.architecture == "hierarchical":
+                        project = generate_project(params)
+                        self._send_json({
+                            "architecture": "hierarchical",
+                            "project": project,
+                            "files": sorted(project.keys()),
+                        })
+                        return
                     content = generate_upf(params)
                 except (TypeError, ValueError) as exc:
                     self._send_json({"error": f"invalid generate params: {exc}"},

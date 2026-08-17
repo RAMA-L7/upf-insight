@@ -1,4 +1,4 @@
-"""Design context — the netlist/design snapshot UPF-080…084 validate against.
+"""Design context - the netlist/design snapshot UPF-080…084 validate against.
 
 v1 is UPF-only, so design-aware rules (layer 6) are silent unless a design
 context is supplied. The context is a minimal, deterministic JSON description

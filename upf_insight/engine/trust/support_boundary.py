@@ -69,7 +69,7 @@ def compute_support_boundary(model: PowerIntentModel) -> SupportReport:
         counts[VALIDATED] += 1
     elif model.supply_states:
         counts[PARTIALLY_VALIDATED] += 1
-        notes.append("Power states exist but no complete PST — voltage-dependent "
+        notes.append("Power states exist but no complete PST - voltage-dependent "
                      "rules run at reduced (PARTIAL) strength.")
 
     if model.switches:

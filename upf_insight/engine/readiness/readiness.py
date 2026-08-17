@@ -1,4 +1,4 @@
-"""Power-intent readiness — a categorical verdict on a validated UPF model.
+"""Power-intent readiness - a categorical verdict on a validated UPF model.
 
 Mirrors the sdc-tools `constraint_readiness` shape: readiness is *categorical*,
 never a numeric score. Each dimension aggregates findings into a status, the
@@ -187,7 +187,7 @@ def compute_readiness(model: PowerIntentModel, check: CheckResult) -> ReadinessR
         rd.overall = INSUFFICIENT_CONTEXT
         rd.notes.append("No UPF commands were parsed.")
     elif not model.psts and not model.supply_states:
-        rd.notes.append("No power states and no PST — power-state readiness "
+        rd.notes.append("No power states and no PST - power-state readiness "
                         "cannot be assessed.")
     if not model.domains:
         rd.notes.append("No power domains were declared.")
@@ -227,7 +227,7 @@ def compute_readiness(model: PowerIntentModel, check: CheckResult) -> ReadinessR
             findings=findings)
 
     # Aggregate tiers only when commands were actually parsed. For empty
-    # input, overall stays INSUFFICIENT_CONTEXT (its default) — reporting
+    # input, overall stays INSUFFICIENT_CONTEXT (its default) - reporting
     # REVIEW_REQUIRED for a file that was never analyzed would be dishonest.
     if model.commands_seen:
         rd.overall = _aggregate(tiers)

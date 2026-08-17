@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   UPF-Insight — components.js
+   UPF-Insight - components.js
    Product component builders (shared with the Ṛta design system). ALL
    user-controlled values are escaped via theme.esc.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { esc, statusBadge, severityClass } from "./theme.js";
+import { RULE_FIXES } from "./rule_fixes.js";
 
 /* ── Page title system ──────────────────────────────────────────────────── */
 export function pageHead(section, title, purpose = "", next = "") {
@@ -101,7 +102,7 @@ export function table(headers, rows, { mono = true, clickable = false, selectedK
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
-function escAttr(v) {
+export function escAttr(v) {
   return String(v == null ? "" : v).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
@@ -113,7 +114,7 @@ export function accordion(title, bodyHtml, { open = false, badge = "" } = {}) {
 /* ── Key-value list ─────────────────────────────────────────────────────── */
 export function kvList(entries) {
   return `<dl class="kv">${entries.map(([k, v]) =>
-    `<dt>${esc(k)}</dt><dd>${v == null ? "—" : esc(v)}</dd>`).join("")}</dl>`;
+    `<dt>${esc(k)}</dt><dd>${v == null ? "-" : esc(v)}</dd>`).join("")}</dl>`;
 }
 
 /* ── Segmented filter ───────────────────────────────────────────────────── */
@@ -149,5 +150,7 @@ export function findingDetailHtml(it, rule) {
     if (rule.layer) parts.push(`<div class="insp-section"><div class="insp-k">Layer</div><div class="insp-v mono">${esc(rule.layer)}</div></div>`);
     if (rule.description) parts.push(`<div class="insp-section"><div class="insp-k">Why it matters</div><div class="insp-v">${esc(rule.description)}</div></div>`);
   }
+  const fix = RULE_FIXES[it.code];
+  if (fix) parts.push(`<div class="insp-section" style="border-top:1px solid var(--border-subtle);padding-top:10px"><div class="insp-k">How to fix</div><div class="insp-v" style="line-height:1.5">${esc(fix)}</div></div>`);
   return parts.join("");
 }
