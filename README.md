@@ -12,6 +12,33 @@ Deterministic · Evidence-backed · Local-first · Reproducible
 
 ---
 
+## 🆕 What's New
+
+### v0.2.0 (latest)
+
+**Flat + Hierarchical power-intent - now first-class in both Generator and
+Validation.**
+
+- **Canonical domain-relation model** - one model powers the generator,
+  validator, CLI, API, reports and UI. Domain types are evidence-based:
+  SWITCHABLE needs switch evidence, ALWAYS-ON needs an explicit declaration,
+  otherwise `UNKNOWN` (never inferred from names).
+- **Power Domain Relation Matrix** - cross-domain interactions only
+  (ISO / LS / ISO+LS / RET / SW / CTRL), each with provenance; clicking a
+  cell opens the evidence. Sharing a supply is a separate **Supply Network**
+  view and never a matrix cell.
+- **Hierarchical generator + validation** - `top.upf` + child files with
+  per-child domain ownership, `load_upf -scope`/`-supply` composition, and a
+  full round-trip: generated UPF validates back to the same architecture,
+  domains, supplies, hierarchy, relations and provenance.
+- **New CLI** - `upf-insight relations FILE...`, `generate --architecture
+  hierarchical --domain-type --domain-power --switch --relation`, and
+  `upf-insight whats-new` (offline release notes from the terminal).
+- **New rules** - UPF-099 (supply-map side undefined) and UPF-100 (loaded
+  UPF file missing).
+
+Full details in [CHANGELOG.md](CHANGELOG.md) or run `upf-insight whats-new`.
+
 ## Why UPF-Insight
 
 Before power-aware implementation (synthesis, place-and-route, power/IR
@@ -20,7 +47,7 @@ find. Domains, supplies, power states, switches, isolation, level shifters and
 retention may each look valid in isolation while the **complete power-intent
 system** remains incomplete, contradictory or unsafe.
 
-UPF-Insight analyzes power intent as a *system* — not as isolated commands —
+UPF-Insight analyzes power intent as a *system* - not as isolated commands -
 and answers the questions engineers actually ask:
 
 - Is anything seriously wrong with this UPF?
@@ -31,10 +58,10 @@ and answers the questions engineers actually ask:
 - Did this change regress the previous baseline?
 
 **Move power-intent verification left.** UPF-Insight is the power-intent
-quality layer that runs *before* power-aware implementation — deterministic,
+quality layer that runs *before* power-aware implementation - deterministic,
 offline, and honest about what it does and does not prove.
 
-## What UPF-Insight is — and is not
+## What UPF-Insight is - and is not
 
 | ✅ Is | ❌ Is not |
 |---|---|
@@ -59,7 +86,7 @@ offline, and honest about what it does and does not prove.
 | **CI Gate** | Policy gate (BLOCKERS_ONLY / NO_READINESS_REGRESSION / STRICT) with exit codes | `upf-insight check --baseline --gate` + workspace **CI Gate** |
 | **Reports** | HTML / JSON / text reports from real analysis evidence | `upf-insight report` + workspace **Reports** |
 | **Generate** | Power-intent skeleton scaffolder | `upf-insight generate` |
-| **Workspace** | Local, offline web UI — feature-first catalog, validate, PST, strategies, design-aware, diff, gate, reports, Test Drive | `upf-insight web` |
+| **Workspace** | Local, offline web UI - feature-first catalog, validate, PST, strategies, design-aware, diff, gate, reports, Test Drive | `upf-insight web` |
 
 ## Quick start
 
@@ -114,7 +141,7 @@ upf-insight diff tests/examples/cpu_subsys/cpu_subsys_v1.upf \
 # 4. gate the change in CI
 upf-insight check tests/examples/cpu_subsys/cpu_subsys_v1.upf --save-baseline baseline.json
 upf-insight check tests/examples/cpu_subsys/cpu_subsys_v2.upf \
-    --baseline baseline.json --gate STRICT; echo $?   # 1 — blocked
+    --baseline baseline.json --gate STRICT; echo $?   # 1 - blocked
 
 # 5. produce a report
 upf-insight report tests/examples/cpu_subsys/cpu_subsys_v2.upf -o report.html
@@ -122,7 +149,7 @@ upf-insight report tests/examples/cpu_subsys/cpu_subsys_v2.upf -o report.html
 
 Walkthrough: [docs/features/README-12-five-minute-upf-workflow.md](docs/features/README-12-five-minute-upf-workflow.md)
 
-`upf-insight` is the CLI. **`upfi` remains as a fully supported alias** —
+`upf-insight` is the CLI. **`upfi` remains as a fully supported alias** -
 every command above works with either name.
 
 ## CLI reference
@@ -134,7 +161,12 @@ upf-insight check design.upf --rule UPF-040 --rule UPF-061   # focused rules
 upf-insight model design.upf -o model.json # power-intent model dump
 upf-insight pst   design.upf               # Power State Table analysis
 upf-insight diff  old.upf new.upf          # semantic power-intent diff (ADD/REMOVE/MODIFY)
+upf-insight relations design.upf           # power-domain relation graph + matrix
 upf-insight generate --domains core,io --always-on clk,rst --retention core
+upf-insight generate --architecture hierarchical --hierarchy core_a,core_b \
+    --domain-type core_a:switchable --switch sw_a:core_a:vdd_aon:vdd_a:pg_en \
+    --relation core_a:sram:isolation,level_shift
+upf-insight whats-new                       # release notes (offline); --all = full changelog
 upf-insight web                            # local workspace (stdlib-only API server)
 ```
 
@@ -149,12 +181,12 @@ Design / UPF authoring → UPF-Insight → understanding · validation ·
 model · PST · readiness · regression protection → power-aware implementation
 ```
 
-1. **Validate** — run the rule engine; every finding traces to a line.
-2. **Build the model** — domains, supplies, switches, states and strategies as
+1. **Validate** - run the rule engine; every finding traces to a line.
+2. **Build the model** - domains, supplies, switches, states and strategies as
    a queryable object graph.
-3. **Analyze the PST** — legal power combinations, declared vs used states,
+3. **Analyze the PST** - legal power combinations, declared vs used states,
    transition consistency.
-4. **Protect regressions** — diff semantically, then gate changes in CI.
+4. **Protect regressions** - diff semantically, then gate changes in CI.
 
 ## Trust model
 
@@ -210,8 +242,8 @@ registry, CLI and local reports are open. See [LICENSE](LICENSE).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: open a private
-report — do not post exploit details publicly.
+report - do not post exploit details publicly.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).

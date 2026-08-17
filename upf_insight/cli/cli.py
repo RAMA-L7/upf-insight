@@ -11,6 +11,7 @@ Command surface (mirrors sdc-tools `cli`):
     upf-insight diff  OLD UPF NEW UPF
     upf-insight generate [--domains ...] [--always-on ...] [--retention ...]
     upf-insight rules [list]
+    upf-insight whats-new [--all]
     upf-insight web   [--port N]
 
 Exit-code contract for CI (mirrors sdc-tools):
@@ -124,9 +125,45 @@ def _parser() -> argparse.ArgumentParser:
     rl.add_argument("--layer", help="filter by layer (SYNTAX|REFERENCE|"
                                     "SUPPLY_DOMAIN|PST|STRATEGY|DESIGN)")
 
+    wn = sub.add_parser("whats-new",
+                        help="Show what changed in recent releases (offline)")
+    wn.add_argument("--all", action="store_true",
+                    help="print the full changelog from the terminal")
+
     web = sub.add_parser("web", help="launch the local workspace")
     web.add_argument("--port", type=int, default=8585)
     return p
+
+
+def _run_whats_new(args) -> int:
+    """Print recent release notes so engineers can see what changed.
+
+    Mirrors the `rta whats-new` flow: the notes ship inside the wheel so this
+    works offline; `--all` prints the full changelog."""
+    from ..engine.meta.release_notes import RELEASE_NOTES, latest_version
+
+    versions = list(RELEASE_NOTES)
+    if not args.all:
+        versions = versions[:3]
+    for i, v in enumerate(versions):
+        header = f"UPF-Insight v{v} - what changed"
+        if i == 0:
+            header += "  (latest)"
+        print(header)
+        bullets = RELEASE_NOTES[v]
+        if not bullets:
+            print("  (no release notes)")
+        for b in bullets:
+            print(f"  * {b}")
+        print()
+    if not args.all and latest_version() != __version__:
+        print(f"You are on v{__version__}. Upgrade with:")
+        print("  pip install -U upf-insight")
+    elif latest_version() == __version__:
+        print("You are up to date.")
+    print("Full changelog: "
+          "https://github.com/RAMA-L7/upf-insight/blob/main/CHANGELOG.md")
+    return 0
 
 
 def _load_policy(args_gate: str) -> tuple[str, Optional[dict]]:
@@ -448,6 +485,7 @@ def main(argv: List[str] | None = None) -> int:
         "diff": _run_diff,
         "generate": _run_generate,
         "rules": _run_rules,
+        "whats-new": _run_whats_new,
         "web": _run_web,
     }
     fn = dispatch.get(args.command)

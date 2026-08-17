@@ -5,128 +5,106 @@ All notable changes to UPF-Insight are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-08-17
 
-### Added
-- Workspace: feature-first Tool Home with grouped capability catalog
+### Added - Flat + Hierarchical power-intent sprint
+
+- **Canonical power-intent model** (`model.relations`) shared by generator,
+  validator, CLI, API, reports and UI - no duplicated engine logic. Domain
+  types are evidence-based: SWITCHABLE requires switch evidence, ALWAYS-ON
+  requires an explicit always-on declaration, everything else is UNKNOWN.
+- **Power Domain Relation Matrix** - cross-domain interactions only
+  (ISO / LS / ISO+LS / RET / SW / CTRL) with per-relation provenance and a
+  cell → evidence inspector. Sharing a supply is a **Supply Network**
+  relationship and never appears in the matrix.
+- **Supply network view** - per-net domain/switch ownership, shown separately
+  from domain relations (shared VSS is infrastructure, not an interaction).
+- **Hierarchy analysis** - domain ownership (UPF file · scope · owner),
+  FLAT/HIERARCHICAL architecture detection, and `load_upf -supply` supply
+  maps with parent-scope resolution.
+- **Flat generator** - arbitrary domains, per-domain power type and supply,
+  domain-relation editor that synthesizes the real `set_isolation` /
+  `set_level_shifter` / `set_retention` commands.
+- **Hierarchical generator** - `top.upf` + child files with per-child domain
+  ownership, `set_scope`/`load_upf -scope`/`-supply` composition, switches
+  and strategies emitted into the owning child, and deterministic output.
+- **Round-trip guarantee** - generated flat and hierarchical projects
+  validate back to the same architecture, domain, supply, hierarchy,
+  relation, topology and provenance model.
+- **Validation rules** - UPF-099 (supply-map side undefined, error) and
+  UPF-100 (loaded UPF file missing, warning), both with provenance.
+- **CLI** - `upf-insight relations FILE... [--json]`; `generate
+  --architecture hierarchical --hierarchy ... --domain-type --domain-power
+  --switch --relation`; reports (text/JSON/HTML) expose architecture,
+  relations, supply sharing, hierarchy and supply maps.
+- **`upf-insight whats-new`** - release notes straight from the terminal
+  (notes ship inside the wheel, so it works offline); `--all` prints the
+  full changelog and it tells you when your installed version is behind.
+  Mirrors the `rta whats-new` flow.
+
+### Added - Workspace / UI
+
+- Feature-first Tool Home with grouped capability catalog
   (CORE / ANALYZE / ADVANCED / OUTPUT & KNOWLEDGE); no hidden "More tools".
-- Workspace: **UPF Diff** page (semantic V1/V2 comparison with next actions).
-- Workspace: **CI Gate** page (policy PASS/FAIL, exit code, reasons, JSON).
-- Workspace: **Reports** page (HTML / JSON / text from real evidence).
+- Generator redesign: Flat/Hierarchical selector, per-domain type column,
+  domain-relation editor, live generated UPF with Copy/Download/Validate.
+- Domain Relations page: domain cards, relation matrix, supply network,
+  domain ownership, topology (AON anchors vs unclassified - never implied
+  nesting) and supply maps.
+- UPF Diff page (semantic V1/V2 with next actions), CI Gate page
+  (PASS/FAIL, exit code, reasons, JSON), Reports page (HTML/JSON/text from
+  real evidence).
 - API: `/api/diff`, `/api/gate`, `/api/report`, `/api/sample` (bounded to
   `workspace/samples/`).
 - Test Drive: full regression scenario (validate → diff → gate) using the
   realistic CPU-subsystem V1/V2 fixtures.
 
+### Added - Engine (post-0.1.0, captured in 0.2.0)
+
+- Syntax + reference layers: UPF-002/003/004/005/006/010/012/013/014/015/016.
+- Isolation family: UPF-040/041/042/043/044/046/047.
+- PST family: UPF-030/031/033/034/035/036.
+- Power-switch family: UPF-070/071/072/073 plus UPF-021/024/025.
+- Retention + level-shifter families: UPF-051/053/061/062/063.
+- Design-aware layer: UPF-080/081/082/083/084 (optional netlist context).
+- `engine.readiness` (READY … BLOCKED across five dimensions),
+  `engine.coverage` (structural domain/supply), `engine.policy`
+  (BLOCKERS_ONLY / NO_READINESS_REGRESSION / STRICT gates + baseline),
+  JUnit and self-contained HTML reporters.
+- Rule registry: 67+ rules (UPF-001…100).
+
 ### Fixed
+
+- **Scope-aware supply resolution** - same-named supplies in sibling scopes
+  (e.g. `core_a/vdd_core_sw` vs `core_b/vdd_core_sw`) never cross-resolve;
+  switch relations attribute to the correct gated domain.
+- **`load_upf` supply maps resolve** - `-supply` references the parent scope,
+  so hierarchical projects no longer produce false UPF-010 "undefined
+  supply" findings.
+- **Strategy scope provenance** - isolation/level-shifter/retention strategies
+  carry their declared scope; rules resolve supplies in that scope instead of
+  the model's final current scope.
+- **Hierarchical generator completeness** - per-domain supplies, switch input
+  supplies and cross-scope relations are emitted correctly; relations
+  synthesize real strategies instead of comments.
 - Finding `file` provenance resolved from the authoritative command-record
-  index — single-file runs always populate it; ambiguous multi-file lines
+  index - single-file runs always populate it; ambiguous multi-file lines
   stay empty (never invented).
-- CLI `--gate` without `--baseline` now actually gates the current evidence
-  (previously silently ignored); an unknown policy is an invalid invocation
-  (exit 2), matching the API's HTTP 400.
-- Semantic diff no longer treats provenance (`declared_line`/`declared_file`)
-  as semantics — comment/line-shift edits produce zero changes.
-- Web design-aware mode: dict design context normalized to `DesignContext`
-  (design-aware rules + readiness no longer silently degrade or crash).
-- Readiness `mode` honestly flips to `DESIGN_AWARE` when a design snapshot
-  is supplied.
-- Suppressed the browser's automatic favicon 404.
-
-### Added
-- Project scaffold: package layout, `pyproject.toml`, MIT `LICENSE`, CLI entry
-  points (`upf-insight` / `upfi`), pytest configuration.
-- `preprocess.upf_preprocess`: Tcl/UPF command-record preprocessing (comments,
-  line continuations, provenance).
-- `model.power_model`: power-intent object graph (domains, supply
-  ports/nets/sets, switches, supply states, PST, isolation/level-shifter/
-  retention strategies).
-- `model.builder`: command-stream → model builder with bounded Tcl-aware
-  tokenization and provenance tracking.
-- `engine.rules`: rule registry (UPF-001…084), deterministic checker, rule
-  handlers (layers 1–5).
-- `engine.trust.support_boundary`: VALIDATED / PARTIALLY_VALIDATED /
-  NETLIST_REQUIRED / TCL_EXECUTION_REQUIRED / UNSUPPORTED / NOT_VALIDATED.
-- `engine.pst.analyzer`: Power State Table expansion and consistency analysis.
-- `engine.engine`: top-level validate orchestration.
-- `cli`: `check`, `model`, `pst`, `diff`, `generate`, `web` commands with
-  exit-code contract (0/1/2/3).
-- `generate.generator`: power-intent skeleton scaffolder.
-- `diff.differ`: semantic model-level UPF diff (ADD/REMOVE/MODIFY).
-- `report.reporter`: text and JSON result formatting.
-- `api.api_server`: stdlib-only local HTTP JSON API + vanilla-JS workspace.
-- `tests`: 8-test core engine suite with golden known-good/known-bad fixtures.
-
-### Added (post-0.1.0)
-- `set_domain_supply_net` / `set_port_attributes` modeled by the builder; the
-  generated skeleton now validates without UPF-001 / UPF-020.
-- Isolation rule family implemented: UPF-040 (non-always-on isolation supply),
-  UPF-041 (self-located isolation in switchable domain), UPF-042 (missing
-  isolation on crossing), UPF-043 (redundant isolation), UPF-044 (-applies_to
-  missing inouts), UPF-046 (invalid clamp value), UPF-047 (isolation control
-  not always-on).
-- PST rule family implemented: UPF-030 (declared state never used), UPF-031
-  (PST references undeclared state), UPF-033 (empty/unreachable PST state),
-  UPF-034 (duplicate/overlapping PST combination), UPF-035 (transition to
-  undeclared state), UPF-036 (strategy not PST-conditioned).
-- `engine.readiness`: categorical power-intent readiness verdict
-  (READY / READY_WITH_ADVISORIES / REVIEW_REQUIRED / BLOCKED /
-  INSUFFICIENT_CONTEXT) across five dimensions (POWER_STATES,
-  SUPPLY_NETWORK, STRATEGIES, CONSISTENCY, DESIGN_CONTEXT).
-- Power-switch rule family implemented: UPF-070 (switch references undefined
-  supply), UPF-071 (switch control not always-on), UPF-072 (always-on signal
-  into switchable domain), UPF-073 (switch output unused), plus UPF-021
-  (domain element overlap), UPF-024 (unknown connect target), UPF-025
-  (unreferenced supply state).
-- Retention + level-shifter families implemented: UPF-051 (retention control
-  not always-on), UPF-053 (save/restore tied to one signal), UPF-061 (missing
-  level shifter across differing voltages), UPF-062 (wrong level-shifter rule
-  for the voltage direction), UPF-063 (self-located LS in switchable domain).
-  `add_port_state` now captures the nominal ON voltage for these checks.
-- `example.ret_ls_bad.upf` fixture + retention/LS tests; suite now 25 tests.
-- Syntax + reference layers implemented: UPF-002 (illegal option), UPF-003
-  (missing required argument), UPF-004 (unsupported upf_version), UPF-005
-  (deprecated add_power_state), UPF-006 (unbalanced braces/brackets), UPF-010
-  (undefined supply reference), UPF-012 (unresolvable instance path), UPF-013
-  (duplicate definition, same-kind only), UPF-014 (use-before-definition),
-  UPF-015 (self-connect dependency cycle), UPF-016 (unverifiable set_scope).
-  Builder records `syntax_issues`, `duplicate_definitions`, `references` and
-  `scope_changes`; the netlist-dependent remainder of 012/015/016 is
-  NETLIST_REQUIRED (deferred to v2). Suite now 27 tests.
-- Design-aware layer implemented: UPF-080 (unknown `-elements` instance),
-  UPF-081 (unknown control signal), UPF-082 (uncovered endpoint crossing),
-  UPF-083 (retention coverage gap), UPF-084 (library PG mismatch). These
-  consume an optional JSON design context (`engine.design.design_context`,
-  wired as `check --netlist design.json` and the web API `design` payload)
-  and stay silent — with a NETLIST_REQUIRED support note — when none is
-  supplied. Suite now 29 tests.
-- `engine.coverage`: structural domain/supply coverage (primary supply,
-  switchability, isolation/retention/level-shifter strategy coverage).
-- `engine.policy`: declarative CI policy engine — BLOCKERS_ONLY /
-  NO_READINESS_REGRESSION / STRICT gates plus validated custom JSON/YAML
-  policies, baseline save/compare, engine-failure-never-disabled.
-- CLI: `rules list`, `coverage`, `report` (HTML/text/JSON), `check
-  --rule/--junit/--save-baseline/--baseline/--gate`.
-- Reporters: JUnit XML and self-contained HTML report.
-- Workspace UI: readiness verdict, coverage table, rules page tabs.
-- `example.iso_bad.upf` and `example.pst_bad.upf` fixtures plus family tests;
-  suite now 20 tests.
-
-### Fixed
-- `add_pst_state -state {vdd ON vss ON}` multi-pair brace groups were parsed
-  only to the first pair, silently dropping supplies from the model.
-- `add_state_transition` read the source state from a non-existent `-state`
-  option instead of the positional argument, dropping every transition.
-- `-elements {u1 u2}` kept the braces in element names, breaking element
-  ownership/overlap checks.
-- Duplicate-definition detection was name-based and would have mis-flagged the
-  legal `create_supply_port vdd` + `create_supply_net vdd -resolve port` pair;
-  it now keys on (kind, name) and tracks nets/ports/sets separately.
+- CLI `--gate` without `--baseline` now actually gates the current evidence;
+  an unknown policy is an invalid invocation (exit 2).
+- Semantic diff no longer treats provenance as semantics - comment/line-shift
+  edits produce zero changes.
+- `add_pst_state` multi-pair brace groups, `add_state_transition` positional
+  source, `-elements` brace stripping, and (kind, name)-keyed duplicate
+  detection all corrected.
 
 ## [0.1.0] - 2026-08-14
 
-Initial pre-release scaffold. See "Unreleased" for the full feature set
+Initial pre-release validation candidate: deterministic UPF power-intent
+validation with 67+ rules, readiness scoring, structural coverage, semantic
+diff, CI gate (exit 0/1/2/3), HTML/JSON reports, and the feature-first web
+workspace with Test Drive. See the [0.2.0] entries for the full feature set
 captured at this baseline.
 
-[Unreleased]: https://github.com/RAMA-L7/upf-insight/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/RAMA-L7/upf-insight/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RAMA-L7/upf-insight/releases/tag/v0.1.0

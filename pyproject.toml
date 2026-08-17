@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "upf-insight"
-version = "0.1.0"
+version = "0.2.0"
 description = "UPF-Insight — deterministic power-intent intelligence for IEEE 1801 (UPF): validate, model, analyze and diff UPF files before power-aware implementation. No EDA tool and no LLM required."
 readme = "README.md"
 license = "MIT"   # PEP 639 SPDX expression; LICENSE file ships via license-files
