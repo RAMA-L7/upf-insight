@@ -23,6 +23,7 @@ class DomainParam:
     primary_power: str = "vdd"
     primary_ground: str = "vss"
     domain_type: str = ""  # "" | "always_on" | "switchable" - explicit, never inferred
+    voltage: str = ""  # e.g. "0.8" or "1.0" - voltage of the domain's primary supply; empty = unknown
 
 
 @dataclass
@@ -47,6 +48,7 @@ class IsolationParam:
     isolation_supply: str = "vdd_iso"
     signal: str = "iso_en"
     location: str = "self"  # self | parent | fanout
+    applies_to: str = "outputs"  # inputs | outputs | both - which boundary direction this isolation covers
 
 
 @dataclass
@@ -57,6 +59,7 @@ class LevelShifterParam:
     location: str = "self"  # self | inout | input | output | fanout
     threshold: str = ""  # optional, e.g. "0.8"
     rule: str = "low_to_high"  # low_to_high | high_to_low | both
+    applies_to: str = "both"  # inputs | outputs | both - which boundary direction this LS covers
 
 
 @dataclass
@@ -67,6 +70,9 @@ class RetentionParam:
     retention_supply: str = "vdd_ret"
     save_signal: str = "save"
     restore_signal: str = "restore"
+    save_sense: str = "high"  # high | low - active sense of save signal
+    restore_sense: str = "low"  # high | low - active sense of restore signal
+    elements: str = ""  # e.g. "regA regB" - the state elements to retain; empty = domain-wide inference
 
 
 @dataclass
@@ -127,8 +133,7 @@ class UPFParams:
     pst_name: str = "pst_top"
     pst_states: List[PstStateParam] = field(
         default_factory=lambda: [
-            PstStateParam("PS_ON", {"vdd": "ON", "vss": "ON"}),
-            PstStateParam("PS_OFF", {"vdd": "OFF", "vss": "ON"}),
+            PstStateParam("ALL_ON", {"vdd": "ON", "vss": "ON"}),
         ]
     )
     always_on: List[str] = field(default_factory=list)
@@ -143,6 +148,22 @@ class UPFParams:
 def _tcl_list(parts: List[str]) -> str:
     """Join identifiers into a braced TCL list (empty -> {})."""
     return "{" + " ".join(parts) + "}"
+
+
+def _cont(first: str, *opts: str) -> str:
+    """Render a command across multiple lines (Tcl line continuation).
+
+    Each option is placed on its own line ending in a backslash so engineers
+    can read every argument of a long command without horizontal scrolling.
+    The UPF preprocessor joins continuations, so the validator sees exactly
+    the same logical command as the single-line form.
+
+    >>> _cont("create_power_switch sw", "-input_supply_port vdd")
+    'create_power_switch sw \\n    -input_supply_port vdd'
+    """
+    if not opts:
+        return first
+    return first + " \\\n    " + " \\\n    ".join(opts)
 
 
 def _validate(p: UPFParams) -> None:
@@ -214,7 +235,11 @@ def _domain_lines(p: UPFParams) -> List[str]:
     lines = ["# -- Power domains ----"]
     for d in p.domains:
         elements = _tcl_list([e for e in d.elements.replace(",", " ").split() if e])
-        lines.append(f"create_power_domain {d.name} -elements {elements}")
+        if elements.strip("{}"):
+            lines.append(_cont(f"create_power_domain {d.name}",
+                               f"-elements {elements}"))
+        else:
+            lines.append(f"create_power_domain {d.name}")
         if d.domain_type == "always_on":
             lines.append(f"set_port_attributes {d.name} -attribute {{always_on true}}")
     lines.append("")
@@ -228,7 +253,9 @@ def _supply_lines(p: UPFParams) -> List[str]:
         lines.append(f"create_supply_port {s} -direction in")
         lines.append(f"create_supply_net {s} -resolve port")
         lines.append(f"connect_supply_net {s} -ports {s}")
-    lines.append(f"create_supply_set primary -function {{power {pp}}} -function {{ground {pg}}}")
+    lines.append(_cont("create_supply_set primary",
+                       f"-function {{power {pp}}}",
+                       f"-function {{ground {pg}}}"))
     # Distinct per-domain power/ground nets must be declared so strategies
     # (isolation/retention) can reference them and the round-trip stays clean.
     declared: set = set()
@@ -239,10 +266,9 @@ def _supply_lines(p: UPFParams) -> List[str]:
             declared.add(net)
             lines.append(f"create_supply_net {net} -resolve net")
             lines.append(f"connect_supply_net {net} -ports {pp}")
-        lines.append(
-            f"set_domain_supply_net {d.name} "
-            f"-primary_power_net {d.primary_power or pp} -primary_ground_net {d.primary_ground or pg}"
-        )
+        lines.append(_cont(f"set_domain_supply_net {d.name}",
+                           f"-primary_power_net {d.primary_power or pp}",
+                           f"-primary_ground_net {d.primary_ground or pg}"))
     lines.append("")
     return lines
 
@@ -291,13 +317,14 @@ def _switch_lines(p: UPFParams) -> List[str]:
         # Canonical IEEE 1801 state triples: {state supply_port {condition}}.
         on_cond = f"{{{s.control_port}}}" if s.control_port else "{}"
         off_cond = f"{{!{s.control_port}}}" if s.control_port else "{}"
-        lines.append(
-            f"create_power_switch {s.name} "
-            f"-input_supply_port {s.input_supply} -output_supply_port {s.output_supply} "
-            f"-control_port {s.control_port} "
-            f"-on_state {{{s.on_state} {{{s.input_supply}}} {on_cond}}} "
-            f"-off_state {{{s.off_state} {{{s.input_supply}}} {off_cond}}}"
-        )
+        lines.append(_cont(
+            f"create_power_switch {s.name}",
+            f"-input_supply_port {s.input_supply}",
+            f"-output_supply_port {s.output_supply}",
+            f"-control_port {s.control_port}",
+            f"-on_state {{{s.on_state} {{{s.input_supply}}} {on_cond}}}",
+            f"-off_state {{{s.off_state} {{{s.input_supply}}} {off_cond}}}",
+        ))
     lines.append("")
     return lines
 
@@ -306,18 +333,33 @@ def _isolation_lines(p: UPFParams) -> List[str]:
     if not p.isolation:
         return []
     lines = ["# -- Isolation ----"]
+    dom = {d.name: d for d in p.domains}
     for iso in p.isolation:
+        # Isolation cells on a switchable domain live in the always-on parent
+        # so the clamp logic keeps its supply when the domain powers down.
+        location = iso.location
+        d = dom.get(iso.domain)
+        if location == "self" and d and d.domain_type == "switchable":
+            location = "parent"
         parts = [
             f"set_isolation iso_{iso.domain}",
             f"-domain {iso.domain}",
             f"-isolation_supply {iso.isolation_supply}",
         ]
         if iso.clamp_value:
-            clamp = iso.clamp_value
-            parts.append(f"-clamp_value {clamp}")
-        parts.append(f"-isolation_signal {iso.signal}")
-        parts.append(f"-location {iso.location}")
-        lines.append(" ".join(parts))
+            parts.append(f"-clamp_value {iso.clamp_value}")
+        parts.append(f"-applies_to {iso.applies_to}")
+        parts.append(f"-location {location}")
+        lines.append(_cont(*parts))
+        # The control signal is a separate command (IEEE 1801
+        # set_isolation_control) so the strategy and its control stay clear.
+        if iso.signal:
+            lines.append(_cont(
+                f"set_isolation_control iso_{iso.domain}",
+                f"-domain {iso.domain}",
+                f"-isolation_signal {iso.signal}",
+                f"-isolation_sense high",
+            ))
     lines.append("")
     return lines
 
@@ -326,38 +368,41 @@ def _level_shifter_lines(p: UPFParams) -> List[str]:
     if not p.level_shifters:
         return []
     lines = ["# -- Level shifters ----"]
+    dom = {d.name: d for d in p.domains}
     for ls in p.level_shifters:
+        # A level shifter on a switchable domain must sit in the always-on
+        # parent - at `self` it would lose its supply when the domain powers
+        # down (UPF-063).
+        location = ls.location
+        d = dom.get(ls.domain)
+        if location == "self" and d and d.domain_type == "switchable":
+            location = "parent"
         parts = [
             f"set_level_shifter ls_{ls.domain}",
             f"-domain {ls.domain}",
-            f"-location {ls.location}",
+            f"-location {location}",
         ]
         if ls.threshold:
             parts.append(f"-threshold {ls.threshold}")
+        parts.append(f"-applies_to {ls.applies_to}")
         parts.append(f"-rule {ls.rule}")
-        lines.append(" ".join(parts))
+        lines.append(_cont(*parts))
     lines.append("")
     return lines
 
 
 def _pst_lines(p: UPFParams) -> List[str]:
+    # Supplies that appear in the PST (order is deterministic).
     supplies = [p.primary_power, p.primary_ground]
-    lines = ["# -- Power states / PST ----"]
-    lines.append(f"add_port_state {p.primary_power} -state {{ON {p.on_voltage}}} -state {{OFF {p.off_voltage}}}")
-    lines.append(f"add_port_state {p.primary_ground} -state {{ON {p.off_voltage}}}")
     for s in p.switches:
-        lines.append(
-            f"add_port_state {s.output_supply} -state {{ON {p.on_voltage}}} -state {{OFF {p.off_voltage}}}"
-        )
         supplies.append(s.output_supply)
-    lines.append(f"create_pst {p.pst_name} -supplies {{{' '.join(dict.fromkeys(supplies))}}}")
-    for st in p.pst_states:
-        # State rows may be authored with the base supply names ("vdd"/"vss")
-        # while the project uses explicit supply names (e.g. "vdd_aon");
-        # map base names onto the actual supplies so every declared state is
-        # used and no PST row silently defaults everything to ON.
+    supplies = list(dict.fromkeys(supplies))
+
+    def _resolve(st: PstStateParam) -> dict:
+        """Map base names (vdd/vss) onto the actual supply names so state
+        rows always reference a supply declared in the PST."""
         full = {}
-        for s in dict.fromkeys(supplies):
+        for s in supplies:
             if s in st.states:
                 full[s] = st.states[s]
             elif s == p.primary_power and "vdd" in st.states:
@@ -366,13 +411,66 @@ def _pst_lines(p: UPFParams) -> List[str]:
                 full[s] = st.states["vss"]
             else:
                 full[s] = "ON"
-        state = " ".join(f"{k} {v}" for k, v in full.items())
-        lines.append(f"add_pst_state {st.name} -pst {p.pst_name} -state {{{state}}}")
+        return full
+
+    # Author rows first (deterministic order), then the auto-generated
+    # per-switch OFF rows.
+    rows: List[tuple] = []
+    for st in p.pst_states:
+        rows.append((st.name, _resolve(st)))
     for s in p.switches:
-        full = {sup: "ON" for sup in dict.fromkeys(supplies)}
+        full = {sup: "ON" for sup in supplies}
         full[s.output_supply] = "OFF"
+        rows.append((f"{s.name}.off", full))
+
+    # Determine exactly which (supply, state) pairs are referenced so we
+    # declare only those port states - declaring an unused state would fire
+    # UPF-030 (declared state never used by the PST).
+    off_supplies: set = {sup for _, row in rows for sup, val in row.items()
+                         if val == "OFF"}
+    # Ground the ON voltage in real domain voltage where the engineer
+    # declared it, so level-shifter thresholds are meaningful.  A supply may
+    # be a domain's primary power directly, or a switch output that feeds a
+    # switchable domain - both resolve to that domain's voltage.
+    switch_out_to_domain = {s.output_supply: s.domain for s in p.switches}
+
+    def _on_voltage(sup: str) -> float:
+        for d in p.domains:
+            if d.primary_power == sup and d.voltage:
+                try:
+                    return float(d.voltage)
+                except ValueError:
+                    pass
+        owner = switch_out_to_domain.get(sup)
+        if owner:
+            for d in p.domains:
+                if d.name == owner and d.voltage:
+                    try:
+                        return float(d.voltage)
+                    except ValueError:
+                        pass
+        return p.on_voltage
+
+    lines = ["# -- Power states / PST ----"]
+    for sup in supplies:
+        # Ground is always present and its ON value is 0V; every other
+        # supply carries the domain voltage (or the project default).
+        if sup == p.primary_ground:
+            on_val = p.off_voltage
+        else:
+            on_val = _on_voltage(sup)
+        parts = [f"add_port_state {sup}",
+                 f"-state {{ON {on_val}}}"]
+        if sup in off_supplies:
+            parts.append(f"-state {{OFF {p.off_voltage}}}")
+        lines.append(_cont(*parts))
+    lines.append(_cont(f"create_pst {p.pst_name}",
+                       f"-supplies {{{' '.join(supplies)}}}"))
+    for name, full in rows:
         state = " ".join(f"{k} {v}" for k, v in full.items())
-        lines.append(f"add_pst_state {s.name}.off -pst {p.pst_name} -state {{{state}}}")
+        lines.append(_cont(f"add_pst_state {name}",
+                           f"-pst {p.pst_name}",
+                           f"-state {{{state}}}"))
     lines.append("")
     return lines
 
@@ -381,16 +479,31 @@ def _retention_lines(p: UPFParams) -> List[str]:
     if not p.retention:
         return []
     lines = ["# -- Retention ----"]
-    lines.append(
-        f"create_supply_set retention -function {{power {p.retention[0].retention_supply}}} "
-        f"-function {{ground {p.primary_ground}}}"
-    )
+    lines.append(_cont(
+        "create_supply_set retention",
+        f"-function {{power {p.retention[0].retention_supply}}}",
+        f"-function {{ground {p.primary_ground}}}",
+    ))
     for r in p.retention:
-        lines.append(
-            f"set_retention ret_{r.domain} -domain {r.domain} "
-            f"-retention_supply retention -save_signal {r.save_signal} "
-            f"-restore_signal {r.restore_signal}"
-        )
+        parts = [
+            f"set_retention ret_{r.domain}",
+            f"-domain {r.domain}",
+            f"-retention_supply retention",
+        ]
+        # Retention elements are explicit when the engineer names them; this
+        # is the difference between "domain has a retention strategy" and
+        # "these specific registers are retained through power-down".
+        if r.elements:
+            parts.append(f"-elements {{{r.elements}}}")
+        lines.append(_cont(*parts))
+        # Save/restore live in the dedicated control command (IEEE 1801
+        # set_retention_control), never folded into set_retention.
+        lines.append(_cont(
+            f"set_retention_control ret_{r.domain}",
+            f"-domain {r.domain}",
+            f"-save_signal {{{r.save_signal} {r.save_sense}}}",
+            f"-restore_signal {{{r.restore_signal} {r.restore_sense}}}",
+        ))
     lines.append("")
     return lines
 
@@ -409,7 +522,7 @@ def _repeater_lines(p: UPFParams) -> List[str]:
         if r.driver_type:
             parts.append(f"-driver_type {r.driver_type}")
         parts.append(f"-repeater_signal {r.signal}")
-        lines.append(" ".join(parts))
+        lines.append(_cont(*parts))
     lines.append("")
     return lines
 
@@ -436,22 +549,41 @@ def _relation_lines(p: UPFParams) -> List[str]:
         iso_supply = to_power or p.primary_power
         for kind in r.kind_list:
             if kind == "isolation":
-                lines.append(
-                    f"set_isolation iso_{r.from_domain}_to_{r.to_domain} "
-                    f"-domain {r.from_domain} -isolation_supply {iso_supply} "
-                    f"-isolation_signal iso_en -location parent"
-                )
+                iso_name = f"iso_{r.from_domain}_to_{r.to_domain}"
+                lines.append(_cont(
+                    f"set_isolation {iso_name}",
+                    f"-domain {r.from_domain}",
+                    f"-isolation_supply {iso_supply}",
+                    f"-applies_to outputs",
+                    f"-location parent",
+                ))
+                lines.append(_cont(
+                    f"set_isolation_control {iso_name}",
+                    f"-domain {r.from_domain}",
+                    f"-isolation_signal iso_en",
+                    f"-isolation_sense high",
+                ))
             elif kind == "level_shift":
-                lines.append(
-                    f"set_level_shifter ls_{r.from_domain}_to_{r.to_domain} "
-                    f"-domain {r.from_domain} -location parent -rule both"
-                )
+                lines.append(_cont(
+                    f"set_level_shifter ls_{r.from_domain}_to_{r.to_domain}",
+                    f"-domain {r.from_domain}",
+                    f"-location parent",
+                    f"-applies_to both",
+                    f"-rule both",
+                ))
             elif kind == "retention":
-                lines.append(
-                    f"set_retention ret_{r.from_domain}_to_{r.to_domain} "
-                    f"-domain {r.from_domain} -retention_supply {iso_supply} "
-                    f"-save_signal save -restore_signal restore"
-                )
+                ret_name = f"ret_{r.from_domain}_to_{r.to_domain}"
+                lines.append(_cont(
+                    f"set_retention {ret_name}",
+                    f"-domain {r.from_domain}",
+                    f"-retention_supply {iso_supply}",
+                ))
+                lines.append(_cont(
+                    f"set_retention_control {ret_name}",
+                    f"-domain {r.from_domain}",
+                    f"-save_signal {{save high}}",
+                    f"-restore_signal {{restore low}}",
+                ))
     lines.append("")
     return lines
 
@@ -540,8 +672,9 @@ def generate_project(p: UPFParams) -> Dict[str, str]:
         top_lines.append(f"create_supply_port {sup} -direction in")
         top_lines.append(f"create_supply_net {sup} -resolve port")
         top_lines.append(f"connect_supply_net {sup} -ports {sup}")
-    top_lines.append(f"create_supply_set primary -function {{power {p.primary_power}}} "
-                     f"-function {{ground {p.primary_ground}}}")
+    top_lines.append(_cont("create_supply_set primary",
+                           f"-function {{power {p.primary_power}}}",
+                           f"-function {{ground {p.primary_ground}}}"))
     top_lines.append("")
 
     top_domains = [d for d in p.domains if not _owner(d)]
@@ -550,21 +683,22 @@ def generate_project(p: UPFParams) -> Dict[str, str]:
                          f"{_tcl_list([e for e in d.elements.replace(',', ' ').split() if e])}")
         if d.domain_type == "always_on":
             top_lines.append(f"set_port_attributes {d.name} -attribute {{always_on true}}")
-        top_lines.append(f"set_domain_supply_net {d.name} "
-                         f"-primary_power_net {d.primary_power or p.primary_power} "
-                         f"-primary_ground_net {d.primary_ground or p.primary_ground}")
+        top_lines.append(_cont(f"set_domain_supply_net {d.name}",
+                               f"-primary_power_net {d.primary_power or p.primary_power}",
+                               f"-primary_ground_net {d.primary_ground or p.primary_ground}"))
     if top_domains:
         top_lines.append("")
     for s in p.switches:
         if _owner(_domain_for(p, s.domain)):
             continue
-        top_lines.append(
-            f"create_power_switch {s.name} "
-            f"-input_supply_port {s.input_supply} -output_supply_port {s.output_supply} "
-            f"-control_port {s.control_port} "
-            f"-on_state {{{s.on_state} {{{s.input_supply}}} {{{s.control_port}}}}} "
-            f"-off_state {{{s.off_state} {{{s.input_supply}}} {{!{s.control_port}}}}}"
-        )
+        top_lines.append(_cont(
+            f"create_power_switch {s.name}",
+            f"-input_supply_port {s.input_supply}",
+            f"-output_supply_port {s.output_supply}",
+            f"-control_port {s.control_port}",
+            f"-on_state {{{s.on_state} {{{s.input_supply}}} {{{s.control_port}}}}}",
+            f"-off_state {{{s.off_state} {{{s.input_supply}}} {{!{s.control_port}}}}}",
+        ))
     if top_domains or p.switches:
         top_lines.append("")
 
@@ -604,22 +738,30 @@ def generate_project(p: UPFParams) -> Dict[str, str]:
             child_lines.append(f"connect_supply_net {sup} -ports {sup}")
         child_lines.append("")
         for d in doms:
-            child_lines.append(f"create_power_domain {d.name} -elements "
-                               f"{_tcl_list([e for e in d.elements.replace(',', ' ').split() if e])}")
+            child_elements = _tcl_list(
+                [e for e in d.elements.replace(',', ' ').split() if e])
+            if child_elements.strip("{}"):
+                child_lines.append(_cont(f"create_power_domain {d.name}",
+                                         f"-elements {child_elements}"))
+            else:
+                child_lines.append(f"create_power_domain {d.name}")
             if d.domain_type == "always_on":
                 child_lines.append(f"set_port_attributes {d.name} -attribute {{always_on true}}")
-            child_lines.append(f"set_domain_supply_net {d.name} "
-                               f"-primary_power_net {d.primary_power or p.primary_power} "
-                               f"-primary_ground_net {d.primary_ground or p.primary_ground}")
+            child_lines.append(_cont(
+                f"set_domain_supply_net {d.name}",
+                f"-primary_power_net {d.primary_power or p.primary_power}",
+                f"-primary_ground_net {d.primary_ground or p.primary_ground}",
+            ))
         child_lines.append("")
         for s in child_sw:
-            child_lines.append(
-                f"create_power_switch {s.name} "
-                f"-input_supply_port {s.input_supply} -output_supply_port {s.output_supply} "
-                f"-control_port {s.control_port} "
-                f"-on_state {{{s.on_state} {{{s.input_supply}}} {{{s.control_port}}}}} "
-                f"-off_state {{{s.off_state} {{{s.input_supply}}} {{!{s.control_port}}}}}"
-            )
+            child_lines.append(_cont(
+                f"create_power_switch {s.name}",
+                f"-input_supply_port {s.input_supply}",
+                f"-output_supply_port {s.output_supply}",
+                f"-control_port {s.control_port}",
+                f"-on_state {{{s.on_state} {{{s.input_supply}}} {{{s.control_port}}}}}",
+                f"-off_state {{{s.off_state} {{{s.input_supply}}} {{!{s.control_port}}}}}",
+            ))
         if child_sw:
             child_lines.append("")
         # Relations owned by this child: emit the real strategy commands (the
@@ -646,8 +788,8 @@ def generate_project(p: UPFParams) -> Dict[str, str]:
         for s in p.switches:
             if _owner(_domain_for(p, s.domain)) == child and s.input_supply:
                 mapped.append(s.input_supply)
-        maps = " ".join(f"-supply {{{sup} {sup}}}" for sup in dict.fromkeys(mapped))
-        top_lines.append(f"load_upf {child}.upf -scope {child} {maps}")
+        maps = [f"-supply {{{sup} {sup}}}" for sup in dict.fromkeys(mapped)]
+        top_lines.append(_cont(f"load_upf {child}.upf", f"-scope {child}", *maps))
         top_lines.append("")
     files["top.upf"] = "\n".join(top_lines)
     return files

@@ -150,6 +150,24 @@ def test_sample_unknown_404(server):
     assert status == 404
 
 
+# ── /api/quality and /api/rules/audit ──────────────────────────────────────
+
+def test_quality_endpoint_reports_corpus_metrics(server):
+    status, body = _get(server, "/api/quality")
+    assert status == 200
+    assert body["detection_rate"] == 1.0
+    assert body["baseline_false_positives"] == 0
+    assert body["total_mutations"] == 42
+    assert "per_category" in body
+
+
+def test_rules_audit_endpoint_is_clean(server):
+    status, body = _get(server, "/api/rules/audit")
+    assert status == 200
+    assert body["clean"] is True
+    assert body["rule_count"] >= 74
+
+
 # ── design-aware normalization ───────────────────────────────────────────────
 
 def _read_design():

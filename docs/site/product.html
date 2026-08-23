@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product — UPF-Insight</title>
+  <meta name="description" content="Deterministic UPF validation, PST analysis, semantic diff, coverage, CI gates and skeleton generation — the full pre-implementation power-intent workflow.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <section class="page-hero container">
+    <span class="eyebrow reveal">Product</span>
+    <h1 class="reveal" style="--reveal-delay:80ms">Everything power-intent,<br><span class="grad-text">nothing magic.</span></h1>
+    <p class="reveal" style="--reveal-delay:160ms">
+      Six deterministic capabilities on one engine. No EDA license, no cloud round-trip,
+      no probabilistic output. What it reports, it can prove.
+    </p>
+  </section>
+
+  <!-- validate -->
+  <section class="section container" id="validate" style="padding-top:40px;">
+    <div class="grid grid-3 stagger">
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">⬡</div>
+        <h3>check — validate</h3>
+        <p>74 rules across seven layers: SYNTAX, REFERENCE, SUPPLY_DOMAIN, PST,
+        STRATEGY, DESIGN and hierarchy promotion. Severity-ranked findings,
+        each anchored to a file and line number.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">▤</div>
+        <h3>model — object graph</h3>
+        <p>Dump the parsed power-intent model as JSON: domains, supply sets,
+        strategies, switches, PSTs. A clean intermediate form for your own tooling
+        and reviews.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">▦</div>
+        <h3>pst — state analysis</h3>
+        <p>Reachability over the Power State Table: impossible states, empty or
+        duplicated rows, undeclared transitions, isolation/level-shifter gaps at
+        domain crossings.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6" id="diff">
+        <div class="card-icon">⇄</div>
+        <h3>diff — semantic compare</h3>
+        <p>Two UPF revisions in, a structural verdict out. Added/dropped domains,
+        rewired supplies, changed clamp values — model-level truth instead of
+        textual churn.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6" id="coverage">
+        <div class="card-icon">◎</div>
+        <h3>coverage — what's missing</h3>
+        <p>Structural domain/supply coverage shows which parts of your power
+        architecture the UPF never describes. Gaps become explicit work items,
+        not silent assumptions.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6" id="generate">
+        <div class="card-icon">✦</div>
+        <h3>generate — scaffold UPF</h3>
+        <p>Standards-correct skeletons for new designs: pick your power domains,
+        always-on blocks and retention needs; get a well-formed starting file in
+        seconds.</p>
+      </div>
+    </div>
+
+    <div class="card spotlight reveal" id="ci" style="margin-top:22px;">
+      <span class="eyebrow">Built for pipelines</span>
+      <h3>CI gates &amp; baselines</h3>
+      <p style="max-width:70ch;">Save a baseline of known findings, then gate future runs against policy:
+      <span class="mono" style="color:var(--accent)">BLOCKERS_ONLY</span>,
+      <span class="mono" style="color:var(--accent)">NO_READINESS_REGRESSION</span> or
+      <span class="mono" style="color:var(--accent)">STRICT</span>.
+      The exit-code contract (0 pass · 1 gate failed · 2 invalid invocation · 3 engine failure)
+      drops into any CI system without glue code. JUnit XML included.</p>
+    </div>
+  </section>
+
+  <!-- trust boundary -->
+  <section class="section container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Trust boundary</span>
+      <h2>Every answer says how sure it is</h2>
+    </div>
+    <div class="grid grid-3 stagger">
+      <div class="card reveal">
+        <span class="chip info">VALIDATED</span>
+        <p style="margin-top:16px;">The finding is backed by the full command stream and model.
+        Deterministic — rerun it anywhere, get the same result.</p>
+      </div>
+      <div class="card reveal">
+        <span class="chip warn">PARTIAL</span>
+        <p style="margin-top:16px;">Some inputs were unavailable (e.g. design netlist context).
+        The rule ran with reduced evidence and says so explicitly.</p>
+      </div>
+      <div class="card reveal">
+        <span class="chip err">UNSUPPORTED</span>
+        <p style="margin-top:16px;">Constructs outside the supported UPF subset are reported as
+        unsupported — never silently ignored. Honest support boundaries, always.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div class="cta-band reveal">
+      <h2>See all 74 rules in detail</h2>
+      <p>Browse the live rule catalog — filter by layer and severity.</p>
+      <a class="btn btn-primary btn-lg" href="rules.html">Open Rule Catalog</a>
+    </div>
+  </section>
+
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

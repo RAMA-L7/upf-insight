@@ -47,6 +47,9 @@ def _parser() -> argparse.ArgumentParser:
                     default="text")
     ck.add_argument("--rule", action="append", default=[],
                     help="only run these rules (repeatable, e.g. --rule UPF-040)")
+    ck.add_argument("--custom-rules", action="append", default=[],
+                    metavar="YAML",
+                    help="apply a user-defined custom rule set (repeatable)")
     ck.add_argument("--save-baseline", metavar="JSON",
                     help="write the current result as a baseline snapshot")
     ck.add_argument("--baseline", metavar="JSON",
@@ -87,10 +90,18 @@ def _parser() -> argparse.ArgumentParser:
     gn.add_argument("--domain-power", action="append", default=[],
                     metavar="NAME:POWER[:GROUND]",
                     help="per-domain primary power net (repeatable)")
+    gn.add_argument("--domain-voltage", action="append", default=[],
+                    metavar="NAME:VOLTS",
+                    help="per-domain primary supply voltage (repeatable), "
+                         "grounds level-shifter thresholds and PST ON values")
     gn.add_argument("--always-on", default="clk,rst",
                     help="comma-separated always-on signals")
     gn.add_argument("--retention", default="",
                     help="comma-separated domain names needing retention")
+    gn.add_argument("--retention-spec", action="append", default=[],
+                    metavar="DOMAIN[:SUPPLY[:SAVE[:RESTORE[:ELEMENTS]]]]",
+                    help="full retention strategy (repeatable), e.g. "
+                         "core:vdd_ret:save:restore:regA,regB")
     gn.add_argument("--design-top", default="top", help="design top module name")
     gn.add_argument("--switch", action="append", default=[],
                     metavar="NAME:DOMAIN:IN:OUT:CTRL",
@@ -122,8 +133,64 @@ def _parser() -> argparse.ArgumentParser:
     rl_list = rl_sub.add_parser("list", help="list all registered rules")
     rl_list.add_argument("--layer", help="filter by layer (SYNTAX|REFERENCE|"
                                          "SUPPLY_DOMAIN|PST|STRATEGY|DESIGN)")
+    rl_list.add_argument("--severity", help="filter by severity "
+                                            "(error|warning|info)")
+    rl_list.add_argument("--search", help="substring match on code/title/"
+                                          "description")
+    rl_show = rl_sub.add_parser("show", help="show full detail for one rule")
+    rl_show.add_argument("code", help="rule code, e.g. UPF-040")
+    rl_audit = rl_sub.add_parser(
+        "audit",
+        help="audit registry/handler sync, metadata, and dependencies")
     rl.add_argument("--layer", help="filter by layer (SYNTAX|REFERENCE|"
                                     "SUPPLY_DOMAIN|PST|STRATEGY|DESIGN)")
+
+    an = sub.add_parser(
+        "analyze",
+        help="one-shot end-to-end analysis: check + coverage + interactions "
+             "+ wildcards + readiness (+ combined HTML with -o *.html)")
+    an.add_argument("files", nargs="+")
+    an.add_argument("--netlist", metavar="FILE",
+                    help="design context (.json snapshot or .v/.sv Verilog "
+                         "netlist) enabling design-aware analysis")
+    an.add_argument("--json", action="store_true",
+                    help="emit the full machine-readable payload")
+    an.add_argument("-o", "--output", metavar="HTML",
+                    help="write a combined HTML report")
+
+    bt = sub.add_parser("batch", help="run check or report over a directory")
+    bt_sub = bt.add_subparsers(dest="batch_cmd", required=True)
+    bt_check = bt_sub.add_parser("check", help="batch-validate every "
+                                               ".upf/.tcl file")
+    bt_check.add_argument("directory")
+    bt_check.add_argument("--format", choices=["text", "json"],
+                          default="text")
+    bt_report = bt_sub.add_parser("report",
+                                  help="write per-file HTML reports plus an "
+                                       "index.html")
+    bt_report.add_argument("directory")
+    bt_report.add_argument("--output-dir", default="upf_reports")
+
+    lt = sub.add_parser("lint", help="reformat/lint a UPF/Tcl file")
+    lt.add_argument("file")
+    lt.add_argument("--check", action="store_true",
+                    help="exit 1 when lint issues are found; never write")
+    lt.add_argument("--fix", action="store_true",
+                    help="rewrite the file in place when issues exist")
+    lt.add_argument("-o", "--output", help="write cleaned output here "
+                                           "instead of --fix in place")
+
+    cn = sub.add_parser("convert", help="convert a UPF file to JSON or YAML")
+    cn.add_argument("file")
+    cn.add_argument("--format", choices=["json", "yaml"], default="json")
+    cn.add_argument("-o", "--output", help="output file (default stdout)")
+
+    ql = sub.add_parser(
+        "quality",
+        help="run the adversarial mutation corpus and report detection rate "
+             "and precision")
+    ql.add_argument("--json", action="store_true",
+                    help="emit machine-readable quality JSON")
 
     wn = sub.add_parser("whats-new",
                         help="Show what changed in recent releases (offline)")
@@ -179,6 +246,15 @@ def _load_policy(args_gate: str) -> tuple[str, Optional[dict]]:
 
 def _run_check(args) -> int:
     result = validate(args.files, rules=args.rule or None, netlist=args.netlist)
+
+    if getattr(args, "custom_rules", None):
+        from ..engine.policy.custom_rules import apply_custom_rules, load_custom_rules
+        from ..preprocess.upf_preprocess import preprocess_many
+
+        records = preprocess_many(args.files)
+        for path in args.custom_rules:
+            result.check.findings.extend(
+                apply_custom_rules(records, load_custom_rules(path)))
 
     if args.save_baseline:
         with open(args.save_baseline, "w", encoding="utf-8") as fh:
@@ -323,17 +399,48 @@ def _run_generate(args) -> int:
                   file=sys.stderr)
             return 2
         powers[parts[0]] = (parts[1], parts[2] if len(parts) > 2 else "")
+    voltages = {}
+    for spec in args.domain_voltage:
+        parts = [s.strip() for s in spec.split(":")]
+        if len(parts) != 2 or not parts[0]:
+            print(f"invalid --domain-voltage (need NAME:VOLTS): {spec}",
+                  file=sys.stderr)
+            return 2
+        try:
+            float(parts[1])
+        except ValueError:
+            print(f"invalid --domain-voltage (VOLTS must be numeric): {spec}",
+                  file=sys.stderr)
+            return 2
+        voltages[parts[0]] = parts[1]
     params = UPFParams(
         design_top=args.design_top,
         domains=[
             DomainParam(d, domain_type=types.get(d, ""),
                         primary_power=powers.get(d, ("", ""))[0],
-                        primary_ground=powers.get(d, ("", ""))[1])
+                        primary_ground=powers.get(d, ("", ""))[1],
+                        voltage=voltages.get(d, ""))
             for d in domains
         ],
         always_on=[s.strip() for s in args.always_on.split(",") if s.strip()],
         retention=[RetentionParam(d) for d in args.retention.split(",") if d.strip()],
     )
+    for spec in args.retention_spec:
+        parts = [s.strip() for s in spec.split(":")]
+        if len(parts) < 1 or not parts[0]:
+            print(f"invalid --retention-spec (need DOMAIN[:SUPPLY[:SAVE[:RESTORE[:ELEMENTS]]]]): {spec}",
+                  file=sys.stderr)
+            return 2
+        ret = RetentionParam(parts[0])
+        if len(parts) > 1 and parts[1]:
+            ret.retention_supply = parts[1]
+        if len(parts) > 2 and parts[2]:
+            ret.save_signal = parts[2]
+        if len(parts) > 3 and parts[3]:
+            ret.restore_signal = parts[3]
+        if len(parts) > 4 and parts[4]:
+            ret.elements = parts[4].replace(",", " ")
+        params.retention.append(ret)
     for spec in args.switch:
         parts = [s.strip() for s in spec.split(":")]
         if len(parts) != 5 or not all(parts):
@@ -458,13 +565,174 @@ def _run_relations(args) -> int:
 def _run_rules(args) -> int:
     from ..engine.rules.rules_registry import registered_rules
 
+    if args.rules_cmd == "audit":
+        from ..engine.rules.audit import audit_registry, format_audit
+
+        report = audit_registry()
+        sys.stdout.write(format_audit(report) + "\n")
+        return 0 if report["clean"] else 1
+
+    if args.rules_cmd == "show":
+        rule = next((r for r in registered_rules()
+                     if r.code.upper() == args.code.upper()), None)
+        if rule is None:
+            print(f"unknown rule code: {args.code}", file=sys.stderr)
+            return 2
+        lines = [
+            f"{rule.code} - {rule.title}",
+            "=" * (len(rule.code) + len(rule.title) + 3),
+            f"Severity : {rule.severity}",
+            f"Layer    : {rule.layer}",
+            f"Context  : {rule.context}",
+            f"Inputs   : {', '.join(rule.semantic_inputs)}",
+        ]
+        if rule.depends_on:
+            lines.append(f"Blocked by: {', '.join(rule.depends_on)}")
+        lines += ["", rule.description, "", f"Regression test: {rule.test_ref}"]
+        sys.stdout.write("\n".join(lines) + "\n")
+        return 0
+
     rules = registered_rules()
     if args.layer:
         rules = [r for r in rules if r.layer == args.layer.upper()]
+    if getattr(args, "severity", None):
+        rules = [r for r in rules if r.severity == args.severity.lower()]
+    if getattr(args, "search", None):
+        needle = args.search.lower()
+        rules = [r for r in rules
+                 if needle in r.code.lower() or needle in r.title.lower()
+                 or needle in r.description.lower()]
     for r in rules:
         sys.stdout.write(f"{r.code:8} {r.severity:7} {r.layer:14} "
                          f"{r.title}\n")
     return 0
+
+
+def _run_analyze(args) -> int:
+    result = validate(args.files, netlist=args.netlist)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            fh.write(format_html(result))
+        print(f"wrote combined analysis report to {args.output}")
+    if args.json:
+        sys.stdout.write(result.to_json())
+        return 0 if result.clean else 1
+    check = result.check
+    readiness = result.readiness
+    lines = [
+        "UPF-INSIGHT - end-to-end analysis",
+        "=================================",
+        f"Files       : {result.file_count} ({result.command_count} commands)",
+        f"Findings    : {check.error_count} errors / "
+        f"{check.warning_count} warnings / {check.info_count} infos",
+        f"Readiness   : {readiness.overall if readiness else 'UNKNOWN'}",
+    ]
+    if result.coverage is not None:
+        lines.append(f"Coverage    : domains {result.coverage.domain_coverage}"
+                     f" / supplies {result.coverage.supply_coverage}")
+    if result.interactions is not None:
+        lines.append(f"Interactions: {len(result.interactions.interactions)}")
+    if result.wildcards is not None and result.wildcards.summary:
+        s = result.wildcards.summary
+        lines.append(f"Wildcards   : {s.get('total', 0)} "
+                     f"(high risk: {s.get('high', 0)})")
+    if result.design_coverage is not None:
+        dc = result.design_coverage
+        lines.append(f"Design cov. : {dc.status} "
+                     f"(unconstrained in: {len(dc.unconstrained_inputs)}, "
+                     f"out: {len(dc.unconstrained_outputs)})")
+    for f in check.findings:
+        if f.severity == "error":
+            loc = f" ({f.file}:L{f.line})" if f.file and f.line else ""
+            lines.append(f"  ERROR {f.rule} {f.subject or '-'}{loc}: {f.message}")
+    lines.append("Note: coverage is NOT correctness; a clean run does not "
+                 "prove power intent.")
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0 if result.clean else 1
+
+
+def _run_batch(args) -> int:
+    from pathlib import Path as _Path
+
+    from ..tools.batch_runner import batch_check, batch_report
+
+    if args.batch_cmd == "check":
+        br = batch_check(_Path(args.directory), format=args.format)
+        if args.format == "json":
+            payload = {
+                "total_files": br.total_files,
+                "passed": br.passed,
+                "failed": br.failed,
+                "per_file": br.per_file,
+            }
+            sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True)
+                             + "\n")
+        else:
+            for entry in br.per_file:
+                status = entry.get("exit_status")
+                mark = "OK " if status == 0 else f"E{status}"
+                sys.stdout.write(
+                    f"{mark:>4} {entry.get('file')} "
+                    f"(errors={entry.get('error_count')}, "
+                    f"warnings={entry.get('warning_count')})\n")
+            sys.stdout.write(f"\n{br.passed}/{br.total_files} files clean\n")
+        return 1 if br.failed else 0
+
+    rep = batch_report(_Path(args.directory), _Path(args.output_dir))
+    print(f"wrote {len(rep.reports)} report file(s) to {rep.output_dir}/")
+    return 0
+
+
+def _run_lint(args) -> int:
+    from ..tools.linter import lint_file
+
+    lr = lint_file(args.file, check_only=args.check, fix=args.fix)
+    for issue in lr.issues:
+        sys.stdout.write(f"{args.file}:{issue.line}: {issue.rule}: "
+                         f"{issue.message}\n")
+    if args.output and not args.fix:
+        with open(args.output, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(lr.cleaned_text)
+    if args.fix and lr.changed:
+        print(f"fixed {args.file}")
+    summary = f"{len(lr.issues)} issue(s)" if lr.issues else "clean"
+    if args.check:
+        print(f"lint: {args.file}: {summary}")
+        return 1 if lr.issues else 0
+    return 0
+
+
+def _run_convert(args) -> int:
+    from ..tools.converter import upf_to_json, upf_to_yaml
+
+    text = upf_to_json(args.file) if args.format == "json" \
+        else upf_to_yaml(args.file)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            fh.write(text)
+    else:
+        sys.stdout.write(text + "\n")
+    return 0
+
+
+def _run_quality(args) -> int:
+    """Run the canonical adversarial mutation corpus and report metrics.
+
+    Mirrors the regression suite: same corpus (``engine/quality.py``), same
+    message-level detection definition. Text output is deterministic; ``--json``
+    emits the structured equivalent. Exit code 0 when nothing is missed.
+    """
+    from ..engine.quality import run_quality_report, format_quality_report
+
+    report = run_quality_report()
+    if args.json:
+        import json as _json
+
+        sys.stdout.write(_json.dumps(
+            report.to_dict(), indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(format_quality_report(report) + "\n")
+    return 0 if not report.missed else 1
 
 
 def _run_web(args) -> int:
@@ -485,6 +753,11 @@ def main(argv: List[str] | None = None) -> int:
         "diff": _run_diff,
         "generate": _run_generate,
         "rules": _run_rules,
+        "analyze": _run_analyze,
+        "batch": _run_batch,
+        "lint": _run_lint,
+        "convert": _run_convert,
+        "quality": _run_quality,
         "whats-new": _run_whats_new,
         "web": _run_web,
     }

@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ṛta — Deterministic UPF 3.0 Power-Intent Validation</title>
+  <meta name="description" content="Deterministic IEEE 1801 (UPF) power-intent validation and pre-implementation analysis. 74 semantic rules. 42/42 adversarial mutations detected.">
+  <style>
+    /* ═══════ Reset ═══════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { color-scheme: dark; scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #08080c; color: #c8c8d0; line-height: 1.65;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    a { color: #5b9bf5; text-decoration: none; transition: color 0.15s; }
+    a:hover { color: #7db4ff; }
+    code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; }
+    img, svg { max-width: 100%; height: auto; }
+
+    /* ═══════ Layout ═══════ */
+    .container { max-width: 1060px; margin: 0 auto; padding: 0 32px; }
+    section { padding: 100px 0; position: relative; }
+    section + section { border-top: 1px solid #13131b; }
+
+    /* ═══════ Typography ═══════ */
+    .sec-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 3px;
+      text-transform: uppercase; color: #5b9bf5; margin-bottom: 14px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .sec-title {
+      font-size: 30px; font-weight: 700; color: #eee; line-height: 1.25;
+      margin-bottom: 16px;
+    }
+    .sec-desc {
+      font-size: 15px; color: #666; max-width: 580px; line-height: 1.8;
+    }
+
+    /* ═══════ Scroll reveal ═══════ */
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.5s ease, transform 0.5s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ═══════ Nav ═══════ */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8, 8, 12, 0.9); backdrop-filter: blur(8px);
+      border-bottom: 1px solid #13131b; height: 48px;
+    }
+    .nav-inner {
+      max-width: 1060px; margin: 0 auto; padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between; height: 48px;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .nav-brand svg { width: 16px; height: 16px; color: #5b9bf5; }
+    .nav-brand-text { font-size: 13px; font-weight: 600; color: #ccc; letter-spacing: 0.3px; }
+    .nav-brand-text b { color: #5b9bf5; font-weight: 700; }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-links button {
+      font-size: 12px; color: #555; background: none; border: none; cursor: pointer;
+      padding: 6px 14px; border-radius: 4px; transition: color 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+    .nav-links button:hover { color: #bbb; background: rgba(255,255,255,0.03); }
+    .nav-links button.active { color: #5b9bf5; }
+    .nav-cta {
+      font-size: 11px; font-weight: 600; color: #08080c; background: #5b9bf5;
+      padding: 5px 14px; border-radius: 4px; transition: background 0.15s;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; letter-spacing: 0.3px;
+    }
+    .nav-cta:hover { background: #7db4ff; color: #08080c; }
+
+    /* ═══════ Page views ═══════ */
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-enter { animation: pageIn 0.25s ease forwards; }
+    @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ═══════ Hero ═══════ */
+    .hero {
+      min-height: calc(100vh - 48px); display: flex; align-items: center;
+      padding-top: 48px; position: relative;
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 10px; font-weight: 600; color: #5b9bf5; letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 24px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .hero-tag::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%; background: #5b9bf5;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5.5vw, 54px); font-weight: 800; color: #eee;
+      line-height: 1.12; margin-bottom: 20px; max-width: 640px;
+    }
+    .hero h1 em { font-style: normal; color: #5b9bf5; }
+    .hero-sub {
+      font-size: 16px; color: #666; max-width: 500px; line-height: 1.8; margin-bottom: 36px;
+    }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 48px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; padding: 11px 22px;
+      border-radius: 4px; border: none; cursor: pointer; transition: all 0.15s;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; letter-spacing: 0.3px;
+    }
+    .btn-primary { background: #5b9bf5; color: #08080c; }
+    .btn-primary:hover { background: #7db4ff; color: #08080c; }
+    .btn-outline { background: transparent; color: #888; border: 1px solid #222; }
+    .btn-outline:hover { border-color: #5b9bf5; color: #5b9bf5; }
+    .hero-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+      background: #13131b; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; max-width: 560px;
+    }
+    .hero-stat { background: #0c0c12; padding: 18px 20px; }
+    .hero-stat .val {
+      font-size: 22px; font-weight: 700; color: #eee;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .hero-stat .val.green { color: #34d399; }
+    .hero-stat .lbl { font-size: 10px; color: #555; margin-top: 3px; letter-spacing: 0.5px; }
+
+    /* ═══════ Problem ═══════ */
+    .prob-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+      background: #13131b; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; margin-top: 40px;
+    }
+    .prob-card { background: #0c0c12; padding: 28px; position: relative; }
+    .prob-card h3 { font-size: 14px; font-weight: 600; color: #ccc; margin-bottom: 8px; }
+    .prob-card p { font-size: 12px; color: #555; line-height: 1.7; }
+
+    /* ═══════ Capabilities ═══════ */
+    .cap-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: #13131b; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; margin-top: 40px;
+    }
+    .cap-card { background: #0c0c12; padding: 24px; transition: background 0.2s; position: relative; }
+    .cap-card:hover { background: #101018; }
+    .cap-rule {
+      font-size: 9px; font-weight: 600; color: #5b9bf5; letter-spacing: 1.5px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; margin-bottom: 10px;
+    }
+    .cap-card h3 { font-size: 14px; font-weight: 600; color: #ccc; margin-bottom: 8px; }
+    .cap-card p { font-size: 11px; color: #555; line-height: 1.6; }
+
+    /* ═══════ Architecture ═══════ */
+    .arch-panel {
+      background: #0c0c12; border: 1px solid #13131b; border-radius: 4px;
+      padding: 36px; margin-top: 40px; overflow-x: auto; text-align: center;
+    }
+    .arch-panel pre {
+      font-size: 11px; line-height: 1.7; color: #666;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      display: inline-block; text-align: left;
+    }
+
+    /* ═══════ Evidence ═══════ */
+    .ev-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: #13131b; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; margin-top: 40px;
+    }
+    .ev-card { background: #0c0c12; padding: 28px; text-align: center; position: relative; }
+    .ev-card .val {
+      font-size: 30px; font-weight: 800; color: #5b9bf5;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .ev-card .val.green { color: #34d399; }
+    .ev-card .lbl { font-size: 12px; color: #666; margin-top: 6px; }
+    .ev-card .sub { font-size: 9px; color: #444; margin-top: 3px; letter-spacing: 0.5px; }
+
+    /* ═══════ Visual System / Carousel ═══════ */
+    .viz-section { padding: 100px 0; }
+    .viz-carousel { margin-top: 48px; position: relative; }
+    .viz-stage {
+      background: #0c0c12; border: 1px solid #13131b; border-radius: 4px;
+      padding: 40px; min-height: 420px; display: flex; align-items: center;
+      justify-content: center; position: relative; overflow: hidden;
+    }
+    .viz-slide { display: none; width: 100%; text-align: center; }
+    .viz-slide.active { display: block; }
+    .viz-slide svg { max-width: 100%; height: auto; max-height: 520px; }
+    .viz-controls {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 24px; padding: 0 4px;
+    }
+    .viz-nav-btn {
+      width: 36px; height: 36px; border-radius: 4px; border: 1px solid #222;
+      background: #0c0c12; color: #666; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; transition: all 0.15s;
+      font-size: 14px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .viz-nav-btn:hover { border-color: #5b9bf5; color: #5b9bf5; }
+    .viz-nav-btn:disabled { opacity: 0.3; cursor: default; border-color: #1a1a22; color: #333; }
+    .viz-center { text-align: center; flex: 1; }
+    .viz-counter {
+      font-size: 11px; color: #555; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      letter-spacing: 1px;
+    }
+    .viz-title {
+      font-size: 14px; font-weight: 600; color: #ccc; margin-top: 6px;
+    }
+    .viz-desc {
+      font-size: 11px; color: #555; margin-top: 4px; max-width: 400px; margin-left: auto; margin-right: auto;
+    }
+    .viz-dots {
+      display: flex; justify-content: center; gap: 6px; margin-top: 20px;
+    }
+    .viz-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #222;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .viz-dot.active { background: #5b9bf5; }
+    .viz-dot:hover { background: #444; }
+
+    /* ═══════ Findings ═══════ */
+    .find-card {
+      background: #0c0c12; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; margin-top: 16px;
+    }
+    .find-head {
+      display: flex; align-items: center; gap: 10px; padding: 14px 20px;
+      border-bottom: 1px solid #13131b;
+    }
+    .find-rule {
+      font-size: 12px; font-weight: 700; color: #eee;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .find-sev {
+      font-size: 9px; font-weight: 600; padding: 2px 8px;
+      border-radius: 2px; text-transform: uppercase; letter-spacing: 0.5px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .sev-err { background: rgba(239,68,68,0.12); color: #ef4444; }
+    .find-msg { font-size: 12px; color: #777; }
+    .find-body { padding: 20px; }
+    .find-explain { font-size: 13px; color: #888; line-height: 1.8; margin-bottom: 16px; }
+    .find-diagram {
+      background: #08080c; border: 1px solid #13131b; border-radius: 3px;
+      padding: 16px; font-size: 11px; color: #666;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      line-height: 1.8; overflow-x: auto; white-space: pre;
+    }
+    .find-fix {
+      margin-top: 14px; padding: 12px 16px; border-radius: 3px;
+      background: rgba(52,211,153,0.05); border: 1px solid rgba(52,211,153,0.12);
+      font-size: 11px; color: #34d399;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    /* ═══════ Adversarial ═══════ */
+    .adv-summary {
+      display: flex; align-items: baseline; gap: 14px; margin-top: 40px; margin-bottom: 24px;
+    }
+    .adv-big {
+      font-size: 40px; font-weight: 800; color: #34d399;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .adv-label { font-size: 14px; color: #666; }
+    .adv-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1px; background: #13131b; border: 1px solid #13131b;
+      border-radius: 4px; overflow: hidden;
+    }
+    .adv-cell { background: #0c0c12; padding: 14px; text-align: center; position: relative; }
+    .adv-cell .cat {
+      font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .adv-cell .n {
+      font-size: 18px; font-weight: 700; color: #34d399; margin-top: 6px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    /* ═══════ CLI ═══════ */
+    .cli-panel {
+      background: #0c0c12; border: 1px solid #13131b; border-radius: 4px;
+      padding: 24px; margin-top: 40px; overflow-x: auto;
+    }
+    .cli-panel pre {
+      font-size: 11px; line-height: 2; color: #888;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .cli-c { color: #444; }
+    .cli-cmd { color: #5b9bf5; }
+    .cli-fl { color: #f59e0b; }
+
+    /* ═══════ Test Drive ═══════ */
+    .td-steps {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+      background: #13131b; border: 1px solid #13131b; border-radius: 4px;
+      overflow: hidden; margin-top: 40px;
+    }
+    .td-step { background: #0c0c12; padding: 20px; }
+    .td-step .num {
+      font-size: 9px; font-weight: 700; color: #5b9bf5; letter-spacing: 1px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; margin-bottom: 8px;
+    }
+    .td-step h4 { font-size: 13px; font-weight: 600; color: #ccc; margin-bottom: 6px; }
+    .td-step p { font-size: 10px; color: #555; line-height: 1.5; }
+    .td-step code {
+      display: block; margin-top: 10px; font-size: 10px; color: #5b9bf5;
+      background: #08080c; padding: 8px 10px; border-radius: 2px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; line-height: 1.6;
+      white-space: pre; overflow-x: auto;
+    }
+
+    /* ═══════ CTA ═══════ */
+    .cta { text-align: center; padding: 100px 0; }
+    .cta h2 { font-size: 30px; font-weight: 700; color: #eee; margin-bottom: 14px; }
+    .cta p { font-size: 15px; color: #666; margin-bottom: 28px; }
+    .cta-code {
+      display: inline-block; background: #0c0c12; border: 1px solid #13131b;
+      border-radius: 4px; padding: 14px 24px; margin-top: 20px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 13px; color: #888;
+    }
+    .cta-code .prompt { color: #444; }
+    .cta-code .cmd { color: #5b9bf5; }
+
+    /* ═══════ Footer ═══════ */
+    footer {
+      border-top: 1px solid #13131b; padding: 36px 0;
+      font-size: 10px; color: #444;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    footer .ft-inner { display: flex; justify-content: space-between; align-items: center; }
+
+    /* ═══════ Features page ═══════ */
+    .feat-hero { padding: 100px 0 48px; }
+    .feat-hero h1 { font-size: 32px; font-weight: 700; color: #eee; margin-bottom: 10px; }
+    .feat-hero p { font-size: 14px; color: #666; max-width: 520px; }
+    .feat-list { padding: 0 0 100px; }
+    .feat-item {
+      background: #0c0c12; border: 1px solid #13131b; border-radius: 4px;
+      margin-bottom: 1px;  transition: border-color 0.2s; position: relative;
+    }
+    .feat-item:hover { border-color: #1e1e28; }
+    .feat-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; cursor: pointer; user-select: none;
+    }
+    .feat-head-left { display: flex; align-items: center; gap: 14px; }
+    .feat-id {
+      font-size: 10px; font-weight: 600; color: #5b9bf5; letter-spacing: 0.5px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; min-width: 36px;
+    }
+    .feat-name { font-size: 14px; font-weight: 600; color: #ccc; }
+    .feat-tag {
+      font-size: 9px; color: #555; padding: 2px 10px; border: 1px solid #1e1e28;
+      border-radius: 2px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .feat-arrow {
+      font-size: 10px; color: #444; transition: transform 0.2s;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .feat-item.open .feat-arrow { transform: rotate(90deg); }
+    .feat-detail {
+      max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease;
+      padding: 0 24px;
+    }
+    .feat-item.open .feat-detail { max-height: 600px; padding: 0 24px 24px; }
+    .feat-detail-inner { border-top: 1px solid #13131b; padding-top: 18px; }
+    .feat-desc { font-size: 12px; color: #666; line-height: 1.8; margin-bottom: 14px; }
+    .feat-usage {
+      background: #08080c; border: 1px solid #13131b; border-radius: 3px;
+      padding: 14px; font-size: 11px; color: #888;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      line-height: 1.7; overflow-x: auto; white-space: pre;
+    }
+    .feat-rules {
+      margin-top: 12px; font-size: 10px; color: #444;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    .feat-rules span { color: #5b9bf5; }
+
+
+
+
+
+
+
+    /* ═══════ Spotlight Glow ═══════ */
+    .sg { position: absolute; inset: 0; pointer-events: none; z-index: 0; opacity: 0; transition: opacity 0.3s; }
+    .sg-dots {
+      background-image: radial-gradient(circle, rgba(91,155,245,0.8) 2px, transparent 2px);
+      background-size: 14px 14px;
+      -webkit-mask-image: radial-gradient(circle 200px at var(--mx) var(--my), black, transparent);
+      mask-image: radial-gradient(circle 200px at var(--mx) var(--my), black, transparent);
+    }
+    .sg-dots.green {
+      background-image: radial-gradient(circle, rgba(52,211,153,0.8) 2px, transparent 2px);
+    }
+    .sg-pulse {
+      background: radial-gradient(circle 100px at var(--mx) var(--my), rgba(91,155,245,0.15), transparent);
+      animation: sgPulse 2s ease-in-out infinite;
+    }
+    .sg-pulse.green {
+      background: radial-gradient(circle 100px at var(--mx) var(--my), rgba(52,211,153,0.15), transparent);
+    }
+    @keyframes sgPulse { 0%,100%{transform:scale(1);opacity:.5} 50%{transform:scale(1.2);opacity:1} }
+    .spot-card:hover .sg { opacity: 1; }
+    .spot-card > *:not(.sg) { position: relative; z-index: 1; }
+
+    /* ═══════ Responsive ═══════ */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero h1 { font-size: 32px; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+      .cap-grid { grid-template-columns: repeat(2, 1fr); }
+      .ev-grid { grid-template-columns: repeat(2, 1fr); }
+      .prob-grid { grid-template-columns: 1fr; }
+      .td-steps { grid-template-columns: 1fr; }
+      .adv-grid { grid-template-columns: repeat(3, 1fr); }
+      .ft-inner { flex-direction: column; gap: 8px; text-align: center; }
+      section { padding: 64px 0; }
+      .viz-stage { padding: 20px; min-height: 280px; }
+    }
+    @media (max-width: 480px) {
+      .adv-grid { grid-template-columns: repeat(2, 1fr); }
+      .cap-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ═══════ Reduced motion ═══════ */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .reveal { opacity: 1; transform: none; }
+      .sg { display: none !important; }
+    }
+  </style>
+</head>
+<body><div id="dbg" style="position:fixed;top:10px;right:10px;z-index:99999;background:rgba(0,0,0,0.9);border:1px solid #333;border-radius:6px;padding:12px;font:11px/1.6 monospace;color:#aaa;min-width:240px">
+<div>Script: <span id="d1" style="color:#5bf">—</span></div>
+<div>Cards: <span id="d2" style="color:#5bf">—</span></div>
+<div>SG divs: <span id="d3" style="color:#5bf">—</span></div>
+<div>Mouse: <span id="d4" style="color:#5bf">—</span></div>
+<div>Hover: <span id="d5" style="color:#5bf">—</span></div>
+<div>--mx: <span id="d6" style="color:#5bf">—</span></div>
+<div>Error: <span id="d7" style="color:#f55">—</span></div>
+</div>
+
+<!-- ═══════ Nav ═══════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand" onclick="showPage('home')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3.5 2.5v8.6"/><path d="M3.5 2.5h4.4a2.6 2.6 0 0 1 0 5.2H3.5"/>
+        <path d="M8 7.7 11.6 13" stroke-linecap="round"/><circle cx="9.2" cy="14.2" r="0.9" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="nav-brand-text">Ṛta<b>-Insight</b></span>
+    </div>
+    <div class="nav-links">
+      <button class="active" onclick="showPage('home')" id="nav-home">Home</button>
+      <button onclick="showPage('features')" id="nav-features">Features</button>
+      <button onclick="scrollTo('#evidence')">Evidence</button>
+      <button onclick="scrollTo('#visuals')">Visuals</button>
+      <button onclick="scrollTo('#cli')">CLI</button>
+    </div>
+    <a class="nav-cta" onclick="showPage('home');setTimeout(()=>scrollTo('#install'),50)">Install</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════ HOME ═══════════════════════════════ -->
+<div id="page-home" class="page active page-enter">
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="container">
+    <div class="hero-tag">UPF 3.0 · IEEE 1801 · Deterministic</div>
+    <h1>Power-intent validation<br>you can <em>reason about</em></h1>
+    <p class="hero-sub">Move power-intent verification left. Ṛta analyzes UPF as a complete system — domains, supplies, switches, strategies, and power states — before power-aware implementation.</p>
+    <div class="hero-actions">
+      <a href="#install" class="btn btn-primary">pip install upf-insight</a>
+      <button class="btn btn-outline" onclick="showPage('features')">View Features →</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">74</div><div class="lbl">semantic rules</div></div>
+      <div class="hero-stat"><div class="val green">42/42</div><div class="lbl">mutations caught</div></div>
+      <div class="hero-stat"><div class="val green">0</div><div class="lbl">false positives</div></div>
+      <div class="hero-stat"><div class="val">94</div><div class="lbl">regression tests</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Problem -->
+<section id="problem">
+  <div class="container">
+    <div class="sec-label reveal">The Problem</div>
+    <div class="sec-title reveal">Power intent fails silently</div>
+    <div class="sec-desc reveal">Before power-aware implementation, UPF problems are expensive to find. Domains, supplies, switches, and strategies may each look valid in isolation while the complete system remains broken.</div>
+    <div class="prob-grid">
+      <div class="prob-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><h3>Fragmented validation</h3><p>Most tools check UPF commands in isolation. A switch looks valid. An isolation strategy looks valid. But the <em>relationship</em> between them goes unchecked.</p></div>
+      <div class="prob-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><h3>Late detection</h3><p>Power-intent errors found during place-and-route are expensive. A missing level shifter at RTL review costs minutes. At tapeout, it costs weeks.</p></div>
+      <div class="prob-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><h3>No regression protection</h3><p>UPF files evolve across design versions. Without semantic diffing and CI gating, validated power intent can silently regress.</p></div>
+      <div class="prob-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><h3>PST complexity</h3><p>Power State Tables encode legal power combinations across supply networks. Manual verification — especially with power switches — is error-prone.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Capabilities -->
+<section id="capabilities">
+  <div class="container">
+    <div class="sec-label reveal">Capabilities</div>
+    <div class="sec-title reveal">Complete power-intent analysis</div>
+    <div class="sec-desc reveal">Every capability traces to a deterministic rule. No LLMs in the analysis path. No probabilistic output. No cloud dependency.</div>
+    <div class="cap-grid">
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">SUPPLY</div><h3>Supply Topology</h3><p>Nets, ports, sets, connectivity, hierarchy. Ground-reference validation. Switched-supply tracking.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">DOMAIN</div><h3>Power Domains</h3><p>Existence, primary supply, element overlap. Always-on/switchable classification with evidence.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">SWITCH</div><h3>Power Switches</h3><p>Control port, ON/OFF conditions, toggle capability, supply references, always-on control.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">STRATEGY</div><h3>Isolation</h3><p>Placement (parent vs self), clamp values, control signals, applies_to coverage.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">STRATEGY</div><h3>Level Shifting</h3><p>Direction validation, threshold range, placement, voltage-aware crossing checks.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">STRATEGY</div><h3>Retention</h3><p>Retention supply, save/restore sequencing, element coverage, control signals.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">PST</div><h3>Power State Table</h3><p>Consistency, impossible states, declared-vs-used, transition validation, supply hierarchy.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">GENERATE</div><h3>UPF Generator</h3><p>Scaffold power-intent from architecture. Flat and hierarchical. Round-trips through validation.</p></div>
+      <div class="cap-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="cap-rule">DIFF</div><h3>Semantic Diff</h3><p>ADD / REMOVE / MODIFY across UPF versions. Baseline comparison. Regression detection.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section id="architecture">
+  <div class="container">
+    <div class="sec-label reveal">Architecture</div>
+    <div class="sec-title reveal">Deterministic pipeline</div>
+    <div class="sec-desc reveal">UPF flows through parser, semantic model, and rule engine to produce evidence-backed findings. Same input, same output, always.</div>
+    <div class="arch-panel reveal"><pre>
+              <span style="color:#ccc">UPF 3.0 Source</span>
+                   │
+                   ▼
+            ┌────────────┐
+            │   Parser   │
+            └─────┬──────┘
+                  │
+                  ▼
+        <span style="color:#5b9bf5">PowerIntentModel</span>
+                  │
+      ┌───────────┼───────────┐
+      ▼           ▼           ▼
+   <span style="color:#666">Supply</span>      <span style="color:#666">Voltage</span>     <span style="color:#666">Strategy</span>
+   <span style="color:#666">Graph</span>       <span style="color:#666">Model</span>        <span style="color:#666">Graph</span>
+      │           │           │
+      └───────────┼───────────┘
+                  ▼
+          <span style="color:#f59e0b">Rule Engine (74 rules)</span>
+                  │
+                  ▼
+         <span style="color:#ccc">Findings + Evidence</span>
+                  │
+        ┌─────────┴─────────┐
+        ▼                   ▼
+     <span style="color:#666">CLI / API</span>          <span style="color:#666">Workspace</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- Evidence -->
+<section id="evidence">
+  <div class="container">
+    <div class="sec-label reveal">Validation Evidence</div>
+    <div class="sec-title reveal">Engineering numbers, not marketing claims</div>
+    <div class="sec-desc reveal">Every metric from a rerunnable test suite over known-good and known-bad fixtures. Reproducible — run it yourself.</div>
+    <div class="ev-grid">
+      <div class="ev-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="val">74</div><div class="lbl">semantic rules</div><div class="sub">6 layers · 11 categories</div></div>
+      <div class="ev-card spot-card"><div class="val green">42/42</div><div class="lbl">mutations detected</div><div class="sub">adversarial corpus · 100%</div></div>
+      <div class="ev-card spot-card"><div class="val green">0</div><div class="lbl">false positives</div><div class="sub">clean baseline · zero errors</div></div>
+      <div class="ev-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="val">94</div><div class="lbl">regression tests</div><div class="sub">engine · flow · API · security</div></div>
+      <div class="ev-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="val">0</div><div class="lbl">LLM calls in analysis</div><div class="sub">deterministic · not probabilistic</div></div>
+      <div class="ev-card spot-card"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="val">0</div><div class="lbl">data leaves your machine</div><div class="sub">offline-first · local analysis</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Visual System / SVG Carousel ═══════ -->
+<section id="visuals" class="viz-section">
+  <div class="container">
+    <div class="sec-label reveal">Visual System</div>
+    <div class="sec-title reveal">How Ṛta represents power intent</div>
+    <div class="sec-desc reveal">10 technical diagrams covering the complete UPF validation vocabulary — from supply topology to adversarial evidence.</div>
+
+    <div class="viz-carousel reveal">
+      <div class="viz-stage" id="viz-stage">
+        <div class="viz-slide active" data-title="Validation Architecture" data-desc="Complete deterministic validation pipeline from UPF source to findings">01</div>
+        <div class="viz-slide" data-title="Power-Domain &amp; Supply Topology" data-desc="Supply hierarchy with domain boundaries, switches, and strategy annotations">02</div>
+        <div class="viz-slide" data-title="Power-Switch States &amp; UPF-039" data-desc="Switch ON/OFF states, impossible states, and supply hierarchy constraints">03</div>
+        <div class="viz-slide" data-title="Isolation Placement" data-desc="Correct (parent) vs wrong (self) isolation placement for switchable domains">04</div>
+        <div class="viz-slide" data-title="Level-Shifter Direction" data-desc="LOW→HIGH and HIGH→LOW level-shifter directions with voltage-aware validation">05</div>
+        <div class="viz-slide" data-title="Retention Strategy" data-desc="State preservation across power-down: save, retain, restore with VDD_RET supply">06</div>
+        <div class="viz-slide" data-title="Power State Table (PST)" data-desc="Legal and illegal power states across supply networks with UPF-039 violation">07</div>
+        <div class="viz-slide" data-title="Evidence Boundary" data-desc="Three zones: UPF-only (definitive), design-aware (partial), out of scope">08</div>
+        <div class="viz-slide" data-title="Finding Cascade &amp; Dependencies" data-desc="Root-cause findings block dependent secondary errors">09</div>
+        <div class="viz-slide" data-title="Adversarial Validation" data-desc="42 intentional defects across 11 categories — all detected, zero missed">10</div>
+      </div>
+
+      <div class="viz-controls">
+        <button class="viz-nav-btn" id="viz-prev" onclick="vizNav(-1)">←</button>
+        <div class="viz-center">
+          <div class="viz-counter" id="viz-counter">01 / 10</div>
+          <div class="viz-title" id="viz-title">Validation Architecture</div>
+          <div class="viz-desc" id="viz-desc">Complete deterministic validation pipeline from UPF source to findings</div>
+        </div>
+        <button class="viz-nav-btn" id="viz-next" onclick="vizNav(1)">→</button>
+      </div>
+
+      <div class="viz-dots" id="viz-dots"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Findings -->
+<section id="findings">
+  <div class="container">
+    <div class="sec-label reveal">Finding Explanation</div>
+    <div class="sec-title reveal">Every finding traces to evidence</div>
+    <div class="sec-desc reveal">Not just an error code — the semantic relationship, why it matters, and what to fix.</div>
+
+    <div class="find-card reveal">
+      <div class="find-head">
+        <span class="find-rule">UPF-062</span>
+        <span class="find-sev sev-err">ERROR</span>
+        <span class="find-msg">Wrong level-shifter rule</span>
+      </div>
+      <div class="find-body">
+        <div class="find-explain">Level shifter <code>ls_core</code> is declared as <code>high_to_low</code>, but CORE (0.8V) → IO (1.0V) is a low-to-high voltage crossing.</div>
+        <div class="find-diagram"><span style="color:#5b9bf5">CORE 0.8V</span> ─────────────► <span style="color:#34d399">IO 1.0V</span>
+      <span style="color:#f59e0b">LOW → HIGH</span>
+
+  Declared: <span style="color:#ef4444">high_to_low  ✗</span>
+  Required: <span style="color:#34d399">low_to_high  ✓</span></div>
+        <div class="find-fix"><strong>Fix:</strong> Change <code>-rule high_to_low</code> to <code>-rule low_to_high</code></div>
+      </div>
+    </div>
+
+    <div class="find-card reveal" style="margin-top:1px">
+      <div class="find-head">
+        <span class="find-rule">UPF-039</span>
+        <span class="find-sev sev-err">ERROR</span>
+        <span class="find-msg">Impossible PST state</span>
+      </div>
+      <div class="find-body">
+        <div class="find-explain">PST state declares VDD = OFF but VDD_SW_OUT = ON. Power cannot appear downstream when the switch input is OFF.</div>
+        <div class="find-diagram"><span style="color:#5b9bf5">VDD</span> ──► <span style="color:#666">SW_CORE</span> ──► <span style="color:#5b9bf5">VDD_SW_OUT</span>
+  <span style="color:#ef4444">OFF</span>                <span style="color:#ef4444">ON  ← impossible</span>
+
+  Power cannot materialize from nowhere.</div>
+        <div class="find-fix"><strong>Fix:</strong> Set VDD_SW_OUT = OFF when VDD = OFF, or remove the state.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Adversarial -->
+<section id="adversarial">
+  <div class="container">
+    <div class="sec-label reveal">Adversarial Validation</div>
+    <div class="sec-title reveal">42 intentional defects. All caught.</div>
+    <div class="sec-desc reveal">We inject deliberate semantic defects across 11 categories and verify every one is detected by its expected rule.</div>
+    <div class="adv-summary reveal">
+      <div class="adv-big">42/42</div>
+      <div class="adv-label">mutations detected · 0 missed · 0 false positives</div>
+    </div>
+    <div class="adv-grid reveal">
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Supply</div><div class="n">5/5</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Switch</div><div class="n">8/8</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Level Shift</div><div class="n">4/4</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Isolation</div><div class="n">5/5</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Retention</div><div class="n">5/5</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Always-On</div><div class="n">2/2</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">PST</div><div class="n">4/4</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Duplicate</div><div class="n">3/3</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Connectivity</div><div class="n">2/2</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Relations</div><div class="n">2/2</div></div>
+      <div class="adv-cell spot-card"><div class="sg sg-dots green"></div><div class="sg sg-pulse green"></div><div class="cat">Syntax</div><div class="n">2/2</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CLI -->
+<section id="cli">
+  <div class="container">
+    <div class="sec-label reveal">Developer</div>
+    <div class="sec-title reveal">CLI-first. API-ready.</div>
+    <div class="sec-desc reveal">Both <code>upf-insight</code> and <code>upfi</code> work interchangeably. Machine-readable JSON for CI. Local workspace for interactive analysis.</div>
+    <div class="cli-panel reveal"><pre><span class="cli-c"># validate a UPF file</span>
+<span class="cli-cmd">upf-insight check</span> soc.upf
+
+<span class="cli-c"># machine-readable output for CI</span>
+<span class="cli-cmd">upf-insight check</span> soc.upf <span class="cli-fl">--format json</span>
+
+<span class="cli-c"># dump the power-intent model</span>
+<span class="cli-cmd">upf-insight model</span> soc.upf <span class="cli-fl">-o model.json</span>
+
+<span class="cli-c"># analyze the Power State Table</span>
+<span class="cli-cmd">upf-insight pst</span> soc.upf
+
+<span class="cli-c"># semantic diff between two versions</span>
+<span class="cli-cmd">upf-insight diff</span> soc.v1.upf soc.v2.upf
+
+<span class="cli-c"># scaffold a power-intent skeleton</span>
+<span class="cli-cmd">upf-insight generate</span> <span class="cli-fl">--domains</span> core,io,sram <span class="cli-fl">--retention</span> core
+
+<span class="cli-c"># gate changes in CI</span>
+<span class="cli-cmd">upf-insight check</span> soc.v2.upf <span class="cli-fl">--baseline</span> baseline.json <span class="cli-fl">--gate STRICT</span>
+
+<span class="cli-c"># produce a report</span>
+<span class="cli-cmd">upf-insight report</span> soc.upf <span class="cli-fl">-o report.html</span>
+
+<span class="cli-c"># launch the workspace (local, offline)</span>
+<span class="cli-cmd">upf-insight web</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- Test Drive -->
+<section id="testdrive">
+  <div class="container">
+    <div class="sec-label reveal">Test Drive</div>
+    <div class="sec-title reveal">5-minute power-intent loop</div>
+    <div class="sec-desc reveal">Run the complete workflow on a realistic CPU-subsystem sample: validate → regress → diff → gate → report.</div>
+    <div class="td-steps">
+      <div class="td-step reveal"><div class="num">01</div><h4>Validate</h4><p>Analyze the known-good version</p><code>upf-insight check \
+  cpu_subsys_v1.upf</code></div>
+      <div class="td-step reveal"><div class="num">02</div><h4>Regress</h4><p>Analyze the regressed version</p><code>upf-insight check \
+  cpu_subsys_v2.upf</code></div>
+      <div class="td-step reveal"><div class="num">03</div><h4>Diff</h4><p>Semantic power-intent diff</p><code>upf-insight diff \
+  v1.upf v2.upf</code></div>
+      <div class="td-step reveal"><div class="num">04</div><h4>Gate</h4><p>CI quality gate (STRICT)</p><code>upf-insight check \
+  v2.upf --gate STRICT</code></div>
+      <div class="td-step reveal"><div class="num">05</div><h4>Report</h4><p>HTML report with evidence</p><code>upf-insight report \
+  v2.upf -o report.html</code></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="install">
+  <div class="container">
+    <div class="sec-label">Get Started</div>
+    <h2>Validate power intent<br>before implementation</h2>
+    <p>Evidence-backed. Deterministic. Offline. No LLMs.</p>
+    <div class="hero-actions" style="justify-content:center">
+      <button class="btn btn-primary" onclick="showPage('features')">Explore Features →</button>
+    </div>
+    <div class="cta-code">
+      <span class="prompt">$ </span><span class="cmd">pip install upf-insight</span><span style="color:#444">  # Python 3.10+</span>
+    </div>
+  </div>
+</section>
+
+</div><!-- /page-home -->
+
+<!-- ═══════════════════════════════ FEATURES ═══════════════════════════════ -->
+<div id="page-features" class="page">
+<div class="feat-hero">
+  <div class="container">
+    <div class="sec-label">Features</div>
+    <h1>Every capability. Every rule.</h1>
+    <p>Click any feature to see what it does, how to use it, and which rules it covers.</p>
+  </div>
+</div>
+<div class="feat-list">
+  <div class="container">
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">01</span><span class="feat-name">UPF Validation</span></div><span class="feat-tag">core</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Deterministic IEEE 1801 (UPF) validation with per-finding source provenance. Every finding traces to a specific line in the UPF source. Rules span 6 layers: syntax, reference, supply/domain, PST, strategy, and design-aware.</div><div class="feat-usage">$ upf-insight check soc.upf
+$ upf-insight check soc.upf --format json
+$ upf-insight check soc.upf --rule UPF-040 --rule UPF-061</div><div class="feat-rules">Rules: <span>UPF-001</span> through <span>UPF-100</span> · 74 rules · 6 layers</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">02</span><span class="feat-name">Power-Intent Model</span></div><span class="feat-tag">core</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Builds a complete object graph from your UPF: domains, supplies, switches, states, PST, and strategies. Queryable from CLI or API.</div><div class="feat-usage">$ upf-insight model soc.upf -o model.json</div><div class="feat-rules">Output: domains, supplies, switches, states, strategies, relations, provenance</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">03</span><span class="feat-name">Power State Table Analysis</span></div><span class="feat-tag">core</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Expands and analyzes the PST for consistency. Detects impossible states (UPF-039), undeclared states, missing PST, empty states, duplicate states, and un-isolated power-down crossings.</div><div class="feat-usage">$ upf-insight pst soc.upf</div><div class="feat-rules">Rules: <span>UPF-030</span> through <span>UPF-039</span> · PST layer</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">04</span><span class="feat-name">UPF Generator</span></div><span class="feat-tag">core</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Scaffold power-intent from architecture parameters. Supports flat and hierarchical designs with per-child domain ownership, domain types, switches, isolation, level shifters, retention, and relations. Generated UPF validates back through the same engine — full round-trip.</div><div class="feat-usage"># Flat generation
+$ upf-insight generate --domains core,io,sram --retention core
+
+# Hierarchical generation
+$ upf-insight generate --architecture hierarchical \
+    --hierarchy core_a,core_b \
+    --domain-type core_a:switchable \
+    --switch sw_a:core_a:vdd_aon:vdd_a:pg_en \
+    --relation core_a:sram:isolation,level_shift</div><div class="feat-rules">Output: complete UPF 3.0 file with domains, supplies, switches, strategies, PST</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">05</span><span class="feat-name">Semantic Diff</span></div><span class="feat-tag">analysis</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Compares two UPF versions semantically — not textually. Classifies changes as ADD, REMOVE, or MODIFY across domains, supplies, switches, strategies, and states.</div><div class="feat-usage">$ upf-insight diff soc.v1.upf soc.v2.upf</div><div class="feat-rules">Output: ADD / REMOVE / MODIFY per object with source line provenance</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">06</span><span class="feat-name">CI Quality Gate</span></div><span class="feat-tag">ci</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Policy-based CI gating with three modes: BLOCKERS_ONLY, NO_READINESS_REGRESSION, and STRICT. Exit codes: 0 pass, 1 issues, 2 invalid, 3 engine failure.</div><div class="feat-usage">$ upf-insight check soc.v2.upf \
+    --baseline baseline.json --gate STRICT</div><div class="feat-rules">Policies: BLOCKERS_ONLY · NO_READINESS_REGRESSION · STRICT</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">07</span><span class="feat-name">HTML / JSON Reports</span></div><span class="feat-tag">output</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Generates reports from real analysis evidence — not template text. HTML reports include finding tables, supply topology, statistics, and source provenance.</div><div class="feat-usage">$ upf-insight report soc.upf -o report.html</div><div class="feat-rules">Formats: HTML · JSON · text</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">08</span><span class="feat-name">Domain Relation Matrix</span></div><span class="feat-tag">analysis</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Cross-domain interaction matrix showing ISO / LS / ISO+LS / RET / SW / CTRL relationships. Each cell has provenance.</div><div class="feat-usage">$ upf-insight relations soc.upf</div><div class="feat-rules">Output: relation matrix + supply network graph</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">09</span><span class="feat-name">Supply Topology Validation</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates supply nets, ports, sets, connectivity, and hierarchy. Checks ground references, switched-supply tracking, duplicate definitions.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-010 --rule UPF-022</div><div class="feat-rules">Rules: <span>UPF-010</span> through <span>UPF-025</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">10</span><span class="feat-name">Power Switch Analysis</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates control ports, ON/OFF conditions, toggle capability, supply references, always-on control signals, and switch-supply topology.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-070 --rule UPF-077</div><div class="feat-rules">Rules: <span>UPF-070</span> through <span>UPF-079</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">11</span><span class="feat-name">Isolation Validation</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates placement (parent vs self), clamp values, control signals, applies_to coverage, always-on supply requirement.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-041 --rule UPF-045</div><div class="feat-rules">Rules: <span>UPF-040</span> through <span>UPF-047</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">12</span><span class="feat-name">Level Shifter Validation</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates direction (low_to_high vs high_to_low), threshold range, placement, voltage-aware crossing checks.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-061 --rule UPF-062</div><div class="feat-rules">Rules: <span>UPF-060</span> through <span>UPF-064</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">13</span><span class="feat-name">Retention Validation</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates retention supply, save/restore sequencing and polarity, element coverage, control signals, always-on requirements.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-051 --rule UPF-054</div><div class="feat-rules">Rules: <span>UPF-050</span> through <span>UPF-054</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">14</span><span class="feat-name">Always-On Checks</span></div><span class="feat-tag">validation</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Validates always-on attribute declarations, always-on signals into switchable domains, and control signals driven by always-on logic.</div><div class="feat-usage">$ upf-insight check soc.upf --rule UPF-047 --rule UPF-072</div><div class="feat-rules">Rules: <span>UPF-047</span>, <span>UPF-071</span>, <span>UPF-072</span></div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">15</span><span class="feat-name">Finding Dependencies</span></div><span class="feat-tag">architecture</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Cascade-aware finding system. Root causes block dependent findings. When UPF-010 fires, UPF-070 is downgraded to BLOCKED.</div><div class="feat-usage"># Automatically applied — no flag needed
+$ upf-insight check soc.upf
+# UPF-010: ERROR (root cause)
+# UPF-070: BLOCKED (dependent on UPF-010)</div><div class="feat-rules">Mechanism: depends_on tuples in rules_registry.py</div></div></div></div>
+
+    <div class="feat-item spot-card" onclick="toggleFeat(this)"><div class="sg sg-dots"></div><div class="sg sg-pulse"></div><div class="feat-head"><div class="feat-head-left"><span class="feat-id">16</span><span class="feat-name">Workspace (Local Web UI)</span></div><span class="feat-tag">ui</span><span class="feat-arrow">▸</span></div><div class="feat-detail"><div class="feat-detail-inner"><div class="feat-desc">Local, offline web workspace. Stdlib-only API server — no dependencies. All analysis runs locally.</div><div class="feat-usage">$ upf-insight web
+# Opens http://localhost:8585</div><div class="feat-rules">No data leaves your machine.</div></div></div></div>
+  </div>
+</div>
+</div><!-- /page-features -->
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="ft-inner">
+      <span><strong style="color:#666">Ṛta</strong> · deterministic UPF 3.0 validation · MIT License</span>
+      <span>No LLMs · No cloud · No data leaves your machine</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+console.log("Script starting...");
+try {
+/* ═══════ SVG Carousel Data ═══════ */
+var vizSlides = [
+  { file: '../diagrams/01-validation-architecture.svg',    title: 'Validation Architecture',             desc: 'Complete deterministic validation pipeline from UPF source to findings' },
+  { file: '../diagrams/02-power-domain-supply-topology.svg', title: 'Power-Domain & Supply Topology',     desc: 'Supply hierarchy with domain boundaries, switches, and strategy annotations' },
+  { file: '../diagrams/03-power-switch-states.svg',        title: 'Power-Switch States & UPF-039',       desc: 'Switch ON/OFF states, impossible states, and supply hierarchy constraints' },
+  { file: '../diagrams/04-isolation-placement.svg',        title: 'Isolation Placement',                 desc: 'Correct (parent) vs wrong (self) isolation placement for switchable domains' },
+  { file: '../diagrams/05-level-shifter-direction.svg',    title: 'Level-Shifter Direction',             desc: 'LOW→HIGH and HIGH→LOW level-shifter directions with voltage-aware validation' },
+  { file: '../diagrams/06-retention-architecture.svg',     title: 'Retention Strategy',                  desc: 'State preservation across power-down: save, retain, restore with VDD_RET supply' },
+  { file: '../diagrams/07-pst-power-states.svg',           title: 'Power State Table (PST)',             desc: 'Legal and illegal power states across supply networks with UPF-039 violation' },
+  { file: '../diagrams/08-evidence-boundary.svg',          title: 'Evidence Boundary',                   desc: 'Three zones: UPF-only (definitive), design-aware (partial), out of scope' },
+  { file: '../diagrams/09-finding-cascade.svg',            title: 'Finding Cascade & Dependencies',      desc: 'Root-cause findings block dependent secondary errors' },
+  { file: '../diagrams/10-adversarial-validation-showcase.svg', title: 'Adversarial Validation',           desc: '42 intentional defects across 11 categories — all detected, zero missed' }
+];
+var vizCurrent = 0;
+var vizLoaded = {};
+
+function vizLoad(idx) {
+  if (vizLoaded[idx]) return;
+  var slide = document.querySelectorAll('.viz-slide')[idx];
+  var data = vizSlides[idx];
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', data.file, true);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      slide.innerHTML = xhr.responseText;
+      vizLoaded[idx] = true;
+    }
+  };
+  xhr.send();
+}
+
+function vizGo(idx) {
+  if (idx < 0 || idx >= vizSlides.length) return;
+  vizCurrent = idx;
+  var slides = document.querySelectorAll('.viz-slide');
+  slides.forEach(function(s) { s.classList.remove('active'); });
+  slides[idx].classList.add('active');
+  vizLoad(idx);
+  document.getElementById('viz-counter').textContent = String(idx + 1).padStart(2, '0') + ' / ' + vizSlides.length;
+  document.getElementById('viz-title').textContent = vizSlides[idx].title;
+  document.getElementById('viz-desc').textContent = vizSlides[idx].desc;
+  var dots = document.querySelectorAll('.viz-dot');
+  dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  document.getElementById('viz-prev').disabled = idx === 0;
+  document.getElementById('viz-next').disabled = idx === vizSlides.length - 1;
+}
+
+function vizNav(dir) { vizGo(vizCurrent + dir); }
+
+/* ═══════ Init carousel dots ═══════ */
+(function() {
+  var dotsEl = document.getElementById('viz-dots');
+  vizSlides.forEach(function(_, i) {
+    var d = document.createElement('div');
+    d.className = 'viz-dot' + (i === 0 ? ' active' : '');
+    d.onclick = function() { vizGo(i); };
+    dotsEl.appendChild(d);
+  });
+  vizLoad(0);
+  document.getElementById('viz-prev').disabled = true;
+})();
+
+/* ═══════ Keyboard nav ═══════ */
+document.addEventListener('keydown', function(e) {
+  if (!document.getElementById('page-home').classList.contains('active')) return;
+  if (e.key === 'ArrowLeft') vizNav(-1);
+  if (e.key === 'ArrowRight') vizNav(1);
+});
+
+/* ═══════ Touch/swipe ═══════ */
+(function() {
+  var stage = document.getElementById('viz-stage');
+  var startX = 0;
+  stage.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) vizNav(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
+/* ═══════ Page switching ═══════ */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active', 'page-enter'); });
+  document.getElementById('page-' + id).classList.add('active', 'page-enter');
+  document.querySelectorAll('.nav-links button').forEach(function(b) { b.classList.remove('active'); });
+  var navBtn = document.getElementById('nav-' + id);
+  if (navBtn) navBtn.classList.add('active');
+  window.scrollTo(0, 0);
+  initReveal();
+}
+
+function scrollTo(sel) {
+  var el = document.querySelector(sel);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleFeat(el) {
+  var wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.feat-item').forEach(function(f) { f.classList.remove('open'); });
+  if (!wasOpen) el.classList.add('open');
+}
+
+function initReveal() {
+  var els = document.querySelectorAll('.reveal');
+  if (!els.length) return;
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+  els.forEach(function(el) { el.classList.remove('visible'); obs.observe(el); });
+}
+initReveal();
+
+/* ═══════ Spotlight Glow JS ═══════ */
+try {
+  var allCards = document.querySelectorAll(".spot-card");
+  var allSg = document.querySelectorAll(".sg-dots");
+  var d1=document.getElementById("d1"),d2=document.getElementById("d2"),d3=document.getElementById("d3");
+  var d4=document.getElementById("d4"),d5=document.getElementById("d5"),d6=document.getElementById("d6"),d7=document.getElementById("d7");
+  if(d1)d1.textContent="YES ("+allCards.length+" cards)";
+  if(d2)d2.textContent=allCards.length;
+  if(d3)d3.textContent=allSg.length;
+
+  allCards.forEach(function(card) {
+    var dots = card.querySelector(".sg-dots");
+    var pulse = card.querySelector(".sg-pulse");
+    if(!dots) return;
+    card.addEventListener("mousemove", function(e) {
+      var r = card.getBoundingClientRect();
+      var x = (e.clientX - r.left) + "px";
+      var y = (e.clientY - r.top) + "px";
+      dots.style.setProperty("--mx", x);
+      dots.style.setProperty("--my", y);
+      dots.style.opacity = "1";
+      if (pulse) {
+        pulse.style.setProperty("--mx", x);
+        pulse.style.setProperty("--my", y);
+        pulse.style.opacity = "1";
+      }
+      if(d4)d4.textContent=Math.round(e.clientX-r.left)+", "+Math.round(e.clientY-r.top);
+      if(d6)d6.textContent=x;
+    });
+    card.addEventListener("mouseenter", function() {
+      if(d5){d5.textContent="YES";d5.style.color="#3f3";}
+    });
+    card.addEventListener("mouseleave", function() {
+      if(d5){d5.textContent="NO";d5.style.color="#f55";}
+      dots.style.opacity = "0";
+      if (pulse) pulse.style.opacity = "0";
+    });
+  });
+  if(d7)d7.textContent="none";
+} catch(e) {
+  var d7=document.getElementById("d7");
+  if(d7)d7.textContent=e.message;
+  console.error("Glow error:",e);
+}
+} catch(e) { console.error("Script error:", e); }
+</script>
+</body>
+</html>

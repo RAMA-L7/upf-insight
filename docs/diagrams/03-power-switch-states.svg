@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 620" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#1a1a1a"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#27ae60"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#c0392b"/>
+    </marker>
+    <style>
+      .title { font-size: 17px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 11px; fill: #666; }
+      .section-title { font-size: 13px; font-weight: 700; fill: #1a1a1a; }
+      .box { fill: #fff; stroke: #1a1a1a; stroke-width: 1.5; rx: 4; }
+      .supply-rail { fill: #e8e8e8; stroke: #1a1a1a; stroke-width: 1.2; rx: 3; }
+      .switch-gate { fill: #fff; stroke: #1a1a1a; stroke-width: 1.5; }
+      .element-box { fill: #fff; stroke: #555; stroke-width: 1; rx: 3; }
+      .label { font-size: 12px; font-weight: 600; fill: #1a1a1a; text-anchor: middle; }
+      .label-sm { font-size: 10px; fill: #555; text-anchor: middle; }
+      .label-mono { font-size: 10px; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .label-volt { font-size: 11px; font-weight: 600; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .connector { fill: none; stroke: #1a1a1a; stroke-width: 1.5; marker-end: url(#arr); }
+      .connector-green { fill: none; stroke: #27ae60; stroke-width: 1.5; marker-end: url(#arr-green); }
+      .connector-red { fill: none; stroke: #c0392b; stroke-width: 1.5; marker-end: url(#arr-red); }
+      .on-badge { fill: #e8f5e9; stroke: #27ae60; stroke-width: 1; rx: 10; }
+      .off-badge { fill: #ffebee; stroke: #c0392b; stroke-width: 1; rx: 10; }
+      .ok-badge { fill: #e8f5e9; stroke: #27ae60; stroke-width: 1.5; rx: 4; }
+      .err-badge { fill: #ffebee; stroke: #c0392b; stroke-width: 1.5; rx: 4; }
+      .state-text { font-size: 11px; font-weight: 600; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .annotation { font-size: 9px; fill: #999; font-family: ui-monospace, monospace; }
+      .ctrl-label { font-size: 9px; fill: #666; text-anchor: middle; font-style: italic; }
+      .divider { stroke: #ddd; stroke-width: 0.8; stroke-dasharray: 4,3; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="410" y="28" class="title" text-anchor="middle">Power-Switch States &amp; UPF-039</text>
+  <text x="410" y="46" class="subtitle" text-anchor="middle">Switch topology with ON/OFF states and impossible-state detection</text>
+
+  <!-- ═══════ LEFT: Supply topology ═══════ -->
+  <text x="200" y="78" class="section-title" text-anchor="middle">Supply Topology</text>
+
+  <!-- VDD -->
+  <rect x="120" y="88" width="160" height="26" class="supply-rail"/>
+  <text x="200" y="106" class="label-sm">VDD</text>
+
+  <!-- Control signal -->
+  <line x1="200" y1="114" x2="200" y2="158" class="connector"/>
+
+  <!-- Switch diamond -->
+  <polygon points="200,158 245,183 200,208 155,183" class="switch-gate"/>
+  <text x="200" y="187" class="label-sm" font-size="9">SW_CORE</text>
+
+  <!-- Control annotation -->
+  <line x1="248" y1="183" x2="300" y2="183" stroke="#888" stroke-width="0.8" stroke-dasharray="3,2"/>
+  <text x="320" y="187" class="ctrl-label">core_power_en</text>
+
+  <!-- VDD_CORE -->
+  <line x1="200" y1="208" x2="200" y2="230" class="connector"/>
+  <rect x="120" y="230" width="160" height="26" class="supply-rail"/>
+  <text x="200" y="248" class="label-sm">VDD_CORE</text>
+
+  <!-- CORE -->
+  <line x1="200" y1="256" x2="200" y2="278" class="connector"/>
+  <rect x="130" y="278" width="140" height="32" class="element-box"/>
+  <text x="200" y="299" class="label-sm">CORE domain</text>
+
+  <!-- ═══════ MIDDLE: ON state ═══════ -->
+  <line x1="410" y1="70" x2="410" y2="590" class="divider"/>
+  <line x1="570" y1="70" x2="570" y2="590" class="divider"/>
+
+  <text x="490" y="78" class="section-title" text-anchor="middle">ON State</text>
+
+  <!-- core_power_en = 1 -->
+  <rect x="440" y="88" width="100" height="24" rx="12" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="104" class="state-text" fill="#27ae60">en = 1</text>
+
+  <!-- VDD ON -->
+  <rect x="420" y="128" width="140" height="22" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="143" class="state-text" fill="#27ae60">VDD       ON</text>
+
+  <!-- VDD_CORE ON -->
+  <rect x="420" y="158" width="140" height="22" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="173" class="state-text" fill="#27ae60">VDD_CORE  ON</text>
+
+  <!-- CORE ON -->
+  <rect x="420" y="188" width="140" height="22" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="203" class="state-text" fill="#27ae60">CORE      ON</text>
+
+  <!-- Flow arrow -->
+  <text x="490" y="234" class="label-mono">supply flows →</text>
+
+  <!-- Mini topology -->
+  <rect x="450" y="248" width="80" height="18" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="261" class="state-text" fill="#27ae60" font-size="9">VDD</text>
+  <line x1="490" y1="266" x2="490" y2="278" class="connector-green"/>
+  <rect x="455" y="278" width="70" height="18" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="291" class="state-text" fill="#27ae60" font-size="9">VDD_CORE</text>
+  <line x1="490" y1="296" x2="490" y2="308" class="connector-green"/>
+  <rect x="460" y="308" width="60" height="18" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="321" class="state-text" fill="#27ae60" font-size="9">CORE</text>
+
+  <text x="490" y="348" class="label-mono" fill="#27ae60">✓ valid</text>
+
+  <!-- ═══════ RIGHT: OFF state ═══════ -->
+  <text x="690" y="78" class="section-title" text-anchor="middle">OFF State</text>
+
+  <!-- core_power_en = 0 -->
+  <rect x="640" y="88" width="100" height="24" rx="12" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="690" y="104" class="state-text" fill="#c0392b">en = 0</text>
+
+  <!-- VDD ON -->
+  <rect x="620" y="128" width="140" height="22" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="690" y="143" class="state-text" fill="#27ae60">VDD       ON</text>
+
+  <!-- VDD_CORE OFF -->
+  <rect x="620" y="158" width="140" height="22" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="690" y="173" class="state-text" fill="#c0392b">VDD_CORE  OFF</text>
+
+  <!-- CORE OFF -->
+  <rect x="620" y="188" width="140" height="22" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="690" y="203" class="state-text" fill="#c0392b">CORE      OFF</text>
+
+  <!-- Flow arrow -->
+  <text x="690" y="234" class="label-mono">supply blocked</text>
+
+  <!-- Mini topology -->
+  <rect x="650" y="248" width="80" height="18" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="690" y="261" class="state-text" fill="#27ae60" font-size="9">VDD</text>
+  <line x1="690" y1="266" x2="690" y2="278" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="708" y="274" class="state-text" fill="#c0392b" font-size="12">✕</text>
+  <rect x="655" y="278" width="70" height="18" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="690" y="291" class="state-text" fill="#c0392b" font-size="9">VDD_CORE</text>
+  <line x1="690" y1="296" x2="690" y2="308" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="708" y="304" class="state-text" fill="#c0392b" font-size="12">✕</text>
+  <rect x="660" y="308" width="60" height="18" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="690" y="321" class="state-text" fill="#c0392b" font-size="9">CORE</text>
+
+  <text x="690" y="348" class="label-mono" fill="#c0392b">✓ valid (switched off)</text>
+
+  <!-- ═══════ BOTTOM: Impossible state ═══════ -->
+  <rect x="60" y="380" width="700" height="200" rx="6" fill="#fff5f5" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="410" y="406" class="section-title" text-anchor="middle" fill="#c0392b">Impossible State — UPF-039 Violation</text>
+
+  <!-- State values -->
+  <rect x="200" y="420" width="160" height="22" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="280" y="435" class="state-text" fill="#c0392b">VDD       OFF</text>
+
+  <rect x="200" y="450" width="160" height="22" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="280" y="465" class="state-text" fill="#c0392b">VDD_CORE  ON  ←</text>
+
+  <!-- Big X -->
+  <text x="460" y="460" font-size="48" fill="#c0392b" font-weight="700">✗</text>
+
+  <!-- Explanation -->
+  <text x="540" y="435" class="label" fill="#c0392b" text-anchor="start" font-size="11">Power cannot appear downstream</text>
+  <text x="540" y="452" class="label" fill="#c0392b" text-anchor="start" font-size="11">when the switch input is OFF.</text>
+
+  <text x="280" y="495" class="annotation" text-anchor="middle">switch input OFF → downstream must be OFF</text>
+
+  <!-- Mini topology with break -->
+  <rect x="150" y="510" width="80" height="18" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="190" y="523" class="state-text" fill="#c0392b" font-size="9">VDD</text>
+  <line x1="190" y1="528" x2="190" y2="540" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="208" y="536" class="state-text" fill="#c0392b" font-size="12">✕</text>
+  <rect x="155" y="540" width="70" height="18" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="190" y="553" class="state-text" fill="#c0392b" font-size="9">VDD_CORE</text>
+  <line x1="190" y1="558" x2="190" y2="570" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="208" y="566" class="state-text" fill="#c0392b" font-size="12">✕</text>
+  <rect x="160" y="570" width="60" height="18" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="190" y="583" class="state-text" fill="#c0392b" font-size="9">CORE</text>
+
+  <!-- Rule callout -->
+  <rect x="300" y="520" width="200" height="50" rx="4" fill="#fff" stroke="#c0392b" stroke-width="1"/>
+  <text x="400" y="540" class="label" fill="#c0392b">UPF-039</text>
+  <text x="400" y="556" class="label-sm" fill="#c0392b">PST state inconsistency</text>
+</svg>

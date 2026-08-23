@@ -1,0 +1,22 @@
+rules:
+  - id: CUST-001
+    severity: error
+    match:
+      command: set_isolation
+      pattern: '^(?!.*-isolation_supply\b)'
+    message: "set_isolation must declare an isolation supply (-isolation_supply)."
+    why: "Without an always-on isolation supply, clamp cells lose power when the domain switches off."
+  - id: CUST-002
+    severity: warning
+    match:
+      command: create_power_switch
+      pattern: '^(?!.*-(?:acknowledge|control_port)\b)'
+    message: "create_power_switch should carry an acknowledge or control port option."
+    why: "Switches without acknowledged control handshake cannot be verified against the PST."
+  - id: CUST-003
+    severity: info
+    match:
+      command: add_pst
+      pattern: \badd_pst\b
+    message: "add_pst is a deprecated UPF 1.0 form; prefer create_pst with declared states."
+    why: "IEEE 1801-2024 deprecates the legacy add_pst usage pattern."

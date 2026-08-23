@@ -16,6 +16,21 @@ from upf_insight.model.builder import build_model
 from upf_insight.preprocess.upf_preprocess import preprocess
 
 
+def _single(text: str) -> str:
+    """Join Tcl line continuations (trailing backslash) into logical lines."""
+    lines = text.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        while line.endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = line[:-1].strip() + " " + lines[i].strip()
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def _check(text):
     return validate_records(preprocess(text, file="t.upf"))
 
@@ -210,8 +225,9 @@ def test_repeater_generator_round_trip():
         domains=[DomainParam("core", "u_core"), DomainParam("io", "u_io")],
         repeaters=[RepeaterParam("io", repeater_supply="vdd_rep", signal="rep_en")],
     ))
-    assert "set_repeater rep_io -domain io -repeater_supply vdd_rep" in text
-    assert "-repeater_signal rep_en" in text
+    flat = _single(text)
+    assert "set_repeater rep_io -domain io -repeater_supply vdd_rep" in flat
+    assert "-repeater_signal rep_en" in flat
     res = _check(text)
     assert "UPF-001" not in {f.rule for f in res.check.findings}
     assert not [f for f in res.check.findings if f.severity == "error"]

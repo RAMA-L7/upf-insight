@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 580" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#1a1a1a"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#c0392b"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#27ae60"/>
+    </marker>
+    <style>
+      .title { font-size: 17px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 11px; fill: #666; }
+      .domain-box { fill: #fafafa; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .domain-aon { fill: #f5f5f0; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .domain-core { fill: #f8f8f8; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .domain-sram { fill: #f3f3f3; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .supply-rail { fill: #e8e8e8; stroke: #1a1a1a; stroke-width: 1.2; rx: 3; }
+      .switch-gate { fill: #fff; stroke: #1a1a1a; stroke-width: 1.5; }
+      .element-box { fill: #fff; stroke: #555; stroke-width: 1; rx: 3; }
+      .label { font-size: 12px; font-weight: 600; fill: #1a1a1a; text-anchor: middle; }
+      .label-lg { font-size: 14px; font-weight: 700; fill: #1a1a1a; text-anchor: middle; }
+      .label-sm { font-size: 10px; fill: #555; text-anchor: middle; }
+      .label-volt { font-size: 11px; font-weight: 600; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .voltage-badge { fill: #f0f0f0; stroke: #1a1a1a; stroke-width: 1; rx: 10; }
+      .connector { fill: none; stroke: #1a1a1a; stroke-width: 1.5; marker-end: url(#arrow); }
+      .supply-line { fill: none; stroke: #1a1a1a; stroke-width: 1.2; }
+      .strategy-line { fill: none; stroke: #666; stroke-width: 1; stroke-dasharray: 5,3; }
+      .annotation { font-size: 9px; fill: #999; font-family: ui-monospace, monospace; }
+      .top-label { font-size: 9px; fill: #aaa; text-transform: uppercase; letter-spacing: 1px; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="400" y="28" class="title" text-anchor="middle">Power-Domain &amp; Supply Topology</text>
+  <text x="400" y="46" class="subtitle" text-anchor="middle">IEEE 1801 power intent — supply hierarchy with domain boundaries</text>
+
+  <!-- Top-level supply label -->
+  <text x="400" y="72" class="top-label">Design Top</text>
+
+  <!-- VDD rail (top) -->
+  <rect x="100" y="80" width="600" height="28" class="supply-rail"/>
+  <text x="400" y="99" class="label">VDD (primary supply)</text>
+
+  <!-- Supply lines down from VDD -->
+  <!-- To AON -->
+  <line x1="200" y1="108" x2="200" y2="148" class="supply-line" marker-end="url(#arrow)"/>
+  <!-- To Power Switch -->
+  <line x1="500" y1="108" x2="500" y2="148" class="supply-line" marker-end="url(#arrow)"/>
+
+  <!-- AON Domain -->
+  <rect x="80" y="148" width="240" height="340" class="domain-aon"/>
+  <text x="200" y="170" class="label-lg">AON Domain</text>
+  <rect x="148" y="178" width="104" height="22" rx="11" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="200" y="193" class="label-volt">1.0V</text>
+  <text x="200" y="218" class="annotation" text-anchor="middle">always-on · no switch</text>
+
+  <!-- AON elements -->
+  <rect x="110" y="236" width="180" height="28" class="element-box"/>
+  <text x="200" y="255" class="label-sm">always_on_logic</text>
+
+  <rect x="110" y="274" width="180" height="28" class="element-box"/>
+  <text x="200" y="293" class="label-sm">io_pads</text>
+
+  <rect x="110" y="312" width="180" height="28" class="element-box"/>
+  <text x="200" y="331" class="label-sm">reset_controller</text>
+
+  <rect x="110" y="350" width="180" height="28" class="element-box"/>
+  <text x="200" y="369" class="label-sm">jtag_tap</text>
+
+  <!-- AON voltage badge -->
+  <rect x="148" y="394" width="104" height="22" rx="11" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="200" y="409" class="label-volt" fill="#27ae60">1.0V ●</text>
+
+  <!-- CORE Domain -->
+  <rect x="380" y="148" width="340" height="340" class="domain-core"/>
+  <text x="550" y="170" class="label-lg">CORE Domain</text>
+  <rect x="502" y="178" width="96" height="22" rx="11" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="550" y="193" class="label-volt">0.8V</text>
+  <text x="550" y="218" class="annotation" text-anchor="middle">switchable · power-gated</text>
+
+  <!-- Power Switch (diamond) -->
+  <polygon points="550,240 590,265 550,290 510,265" class="switch-gate"/>
+  <text x="550" y="269" class="label-sm" font-size="9">SW_CORE</text>
+  <text x="550" y="306" class="annotation" text-anchor="middle">control: core_power_en</text>
+
+  <!-- VDD_CORE supply rail (inside CORE domain) -->
+  <rect x="430" y="318" width="240" height="24" class="supply-rail"/>
+  <text x="550" y="335" class="label-sm">VDD_CORE (switched supply)</text>
+
+  <!-- CORE elements -->
+  <rect x="420" y="356" width="260" height="28" class="element-box"/>
+  <text x="550" y="375" class="label-sm">cpu_pipeline</text>
+
+  <rect x="420" y="394" width="260" height="28" class="element-box"/>
+  <text x="550" y="413" class="label-sm">data_cache</text>
+
+  <rect x="420" y="432" width="260" height="28" class="element-box"/>
+  <text x="550" y="451" class="label-sm">control_regs</text>
+
+  <!-- CORE voltage badge -->
+  <rect x="502" y="466" width="96" height="22" rx="11" fill="#e3f2fd" stroke="#2196f3" stroke-width="1"/>
+  <text x="550" y="481" class="label-volt" fill="#2196f3">0.8V ●</text>
+
+  <!-- Strategy annotations between domains -->
+  <!-- Isolation -->
+  <line x1="320" y1="260" x2="380" y2="260" class="strategy-line"/>
+  <text x="350" y="252" class="annotation" text-anchor="middle" font-size="8">ISO</text>
+
+  <!-- Level Shifter -->
+  <line x1="320" y1="340" x2="380" y2="340" class="strategy-line"/>
+  <text x="350" y="332" class="annotation" text-anchor="middle" font-size="8">LS</text>
+
+  <!-- Retention -->
+  <line x1="320" y1="420" x2="380" y2="420" class="strategy-line"/>
+  <text x="350" y="412" class="annotation" text-anchor="middle" font-size="8">RET</text>
+
+  <!-- Legend -->
+  <rect x="50" y="520" width="700" height="48" rx="4" fill="#fafafa" stroke="#ddd" stroke-width="0.8"/>
+  <text x="400" y="538" class="top-label">Legend</text>
+
+  <!-- Legend items -->
+  <rect x="100" y="544" width="40" height="10" class="supply-rail" rx="2"/>
+  <text x="150" y="554" class="annotation">Supply rail</text>
+
+  <polygon points="260,544 280,554 260,564 240,554" class="switch-gate" stroke-width="1"/>
+  <text x="298" y="554" class="annotation">Power switch</text>
+
+  <line x1="400" y1="549" x2="440" y2="549" class="strategy-line"/>
+  <text x="458" y="554" class="annotation">Strategy (ISO/LS/RET)</text>
+
+  <rect x="560" y="544" width="30" height="10" class="element-box" rx="2"/>
+  <text x="600" y="554" class="annotation">Element</text>
+</svg>

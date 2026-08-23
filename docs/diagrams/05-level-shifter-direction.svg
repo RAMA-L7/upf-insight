@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 520" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#1a1a1a"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#27ae60"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#c0392b"/>
+    </marker>
+    <style>
+      .title { font-size: 17px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 11px; fill: #666; }
+      .section-title { font-size: 13px; font-weight: 700; fill: #1a1a1a; }
+      .domain-box { fill: #fafafa; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .ls-box { fill: #e3f2fd; stroke: #2196f3; stroke-width: 1.5; rx: 4; }
+      .ls-ok { fill: #e8f5e9; stroke: #27ae60; stroke-width: 1.5; rx: 4; }
+      .ls-err { fill: #ffebee; stroke: #c0392b; stroke-width: 1.5; rx: 4; }
+      .element-box { fill: #fff; stroke: #555; stroke-width: 1; rx: 3; }
+      .label { font-size: 12px; font-weight: 600; fill: #1a1a1a; text-anchor: middle; }
+      .label-lg { font-size: 14px; font-weight: 700; fill: #1a1a1a; text-anchor: middle; }
+      .label-sm { font-size: 10px; fill: #555; text-anchor: middle; }
+      .label-mono { font-size: 10px; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .label-volt { font-size: 12px; font-weight: 700; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .connector { fill: none; stroke: #1a1a1a; stroke-width: 1.5; marker-end: url(#arr); }
+      .connector-green { fill: none; stroke: #27ae60; stroke-width: 2; marker-end: url(#arr-green); }
+      .connector-red { fill: none; stroke: #c0392b; stroke-width: 2; marker-end: url(#arr-red); }
+      .ls-arrow { fill: none; stroke: #2196f3; stroke-width: 2; }
+      .annotation { font-size: 9px; fill: #999; font-family: ui-monospace, monospace; }
+      .direction-label { font-size: 11px; font-weight: 600; text-anchor: middle; }
+      .divider { stroke: #ddd; stroke-width: 0.8; stroke-dasharray: 4,3; }
+      .arrow-up { font-size: 14px; fill: #27ae60; text-anchor: middle; }
+      .arrow-down { font-size: 14px; fill: #c0392b; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="410" y="28" class="title" text-anchor="middle">Level-Shifter Direction</text>
+  <text x="410" y="46" class="subtitle" text-anchor="middle">UPF-061/062 — voltage crossing requires correct direction declaration</text>
+
+  <!-- ═══════ LEFT: LOW → HIGH (correct) ═══════ -->
+  <text x="205" y="78" class="section-title" text-anchor="middle">✓ LOW → HIGH (core to AON)</text>
+
+  <!-- CORE domain (source) -->
+  <rect x="50" y="90" width="140" height="160" class="domain-box"/>
+  <text x="120" y="110" class="label">CORE</text>
+  <rect x="80" y="118" width="80" height="20" rx="10" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="120" y="132" class="label-volt">0.8V</text>
+
+  <!-- Elements in CORE -->
+  <rect x="68" y="148" width="104" height="22" class="element-box"/>
+  <text x="120" y="163" class="label-sm">cpu_out</text>
+  <rect x="68" y="178" width="104" height="22" class="element-box"/>
+  <text x="120" y="193" class="label-sm">cache_data</text>
+  <rect x="68" y="208" width="104" height="22" class="element-box"/>
+  <text x="120" y="223" class="label-sm">ctrl_reg</text>
+
+  <!-- Level Shifter (bridge) -->
+  <rect x="200" y="120" width="100" height="80" class="ls-ok"/>
+  <text x="250" y="145" class="label" font-size="11" fill="#27ae60">Level Shifter</text>
+  <text x="250" y="162" class="label-sm" fill="#27ae60">low_to_high</text>
+  <!-- Direction arrow inside -->
+  <text x="250" y="185" font-size="20" fill="#27ae60" text-anchor="middle">↑</text>
+  <text x="250" y="197" class="annotation" text-anchor="middle">0.8V → 1.0V</text>
+
+  <!-- Arrow: CORE → LS -->
+  <line x1="190" y1="160" x2="198" y2="160" class="connector-green"/>
+
+  <!-- AON domain (target) -->
+  <rect x="310" y="90" width="140" height="160" class="domain-box"/>
+  <text x="380" y="110" class="label">AON</text>
+  <rect x="350" y="118" width="80" height="20" rx="10" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="380" y="132" class="label-volt">1.0V</text>
+
+  <!-- Elements in AON -->
+  <rect x="328" y="148" width="104" height="22" class="element-box"/>
+  <text x="380" y="163" class="label-sm">aon_in</text>
+  <rect x="328" y="178" width="104" height="22" class="element-box"/>
+  <text x="380" y="193" class="label-sm">io_data</text>
+  <rect x="328" y="208" width="104" height="22" class="element-box"/>
+  <text x="380" y="223" class="label-sm">reset_in</text>
+
+  <!-- Arrow: LS → AON -->
+  <line x1="302" y1="160" x2="308" y2="160" class="connector-green"/>
+
+  <!-- Signal flow annotation -->
+  <text x="205" y="270" class="label-mono" fill="#27ae60">signal flows low voltage → high voltage</text>
+  <text x="205" y="284" class="label-mono" fill="#27ae60">set_level_shifter_rule low_to_high</text>
+
+  <!-- ═══════ RIGHT: HIGH → LOW (correct) ═══════ -->
+  <text x="620" y="78" class="section-title" text-anchor="middle">✓ HIGH → LOW (AON to core)</text>
+
+  <!-- AON domain (source) -->
+  <rect x="460" y="90" width="140" height="160" class="domain-box"/>
+  <text x="530" y="110" class="label">AON</text>
+  <rect x="500" y="118" width="80" height="20" rx="10" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="530" y="132" class="label-volt">1.0V</text>
+
+  <!-- Elements in AON -->
+  <rect x="478" y="148" width="104" height="22" class="element-box"/>
+  <text x="530" y="163" class="label-sm">aon_out</text>
+  <rect x="478" y="178" width="104" height="22" class="element-box"/>
+  <text x="530" y="193" class="label-sm">io_ctrl</text>
+  <rect x="478" y="208" width="104" height="22" class="element-box"/>
+  <text x="530" y="223" class="label-sm">reset_out</text>
+
+  <!-- Level Shifter (bridge) -->
+  <rect x="610" y="120" width="100" height="80" class="ls-ok"/>
+  <text x="660" y="145" class="label" font-size="11" fill="#27ae60">Level Shifter</text>
+  <text x="660" y="162" class="label-sm" fill="#27ae60">high_to_low</text>
+  <!-- Direction arrow inside -->
+  <text x="660" y="185" font-size="20" fill="#27ae60" text-anchor="middle">↓</text>
+  <text x="660" y="197" class="annotation" text-anchor="middle">1.0V → 0.8V</text>
+
+  <!-- Arrow: AON → LS -->
+  <line x1="602" y1="160" x2="608" y2="160" class="connector-green"/>
+
+  <!-- CORE domain (target) -->
+  <rect x="720" y="90" width="140" height="160" class="domain-box"/>
+  <text x="790" y="110" class="label">CORE</text>
+  <rect x="760" y="118" width="80" height="20" rx="10" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="790" y="132" class="label-volt">0.8V</text>
+
+  <!-- Elements in CORE -->
+  <rect x="738" y="148" width="104" height="22" class="element-box"/>
+  <text x="790" y="163" class="label-sm">core_in</text>
+  <rect x="738" y="178" width="104" height="22" class="element-box"/>
+  <text x="790" y="193" class="label-sm">cache_in</text>
+  <rect x="738" y="208" width="104" height="22" class="element-box"/>
+  <text x="790" y="223" class="label-sm">ctrl_in</text>
+
+  <!-- Arrow: LS → CORE -->
+  <line x1="712" y1="160" x2="718" y2="160" class="connector-green"/>
+
+  <!-- Signal flow annotation -->
+  <text x="620" y="270" class="label-mono" fill="#27ae60">signal flows high voltage → low voltage</text>
+  <text x="620" y="284" class="label-mono" fill="#27ae60">set_level_shifter_rule high_to_low</text>
+
+  <!-- ═══════ BOTTOM: Wrong direction ═══════ -->
+  <line x1="30" y1="310" x2="790" y2="310" class="divider"/>
+  <text x="410" y="335" class="section-title" text-anchor="middle" fill="#c0392b">✗ Wrong Direction — UPF-062 Finding</text>
+
+  <!-- Wrong case: CORE → AON but declared high_to_low -->
+  <rect x="100" y="350" width="620" height="150" rx="6" fill="#fff5f5" stroke="#c0392b" stroke-width="1.5"/>
+
+  <!-- Voltage labels -->
+  <rect x="140" y="368" width="80" height="24" rx="12" fill="#e3f2fd" stroke="#2196f3" stroke-width="1"/>
+  <text x="180" y="385" class="label-volt" fill="#2196f3">0.8V</text>
+
+  <rect x="600" y="368" width="80" height="24" rx="12" fill="#e3f2fd" stroke="#2196f3" stroke-width="1"/>
+  <text x="640" y="385" class="label-volt" fill="#2196f3">1.0V</text>
+
+  <!-- Actual (wrong) -->
+  <text x="130" y="420" class="label" fill="#c0392b" text-anchor="start" font-size="11">Actual:</text>
+  <line x1="180" y1="415" x2="580" y2="415" class="connector-red"/>
+  <rect x="300" y="404" width="140" height="22" rx="3" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="370" y="419" class="direction-label" fill="#c0392b">HIGH → LOW ✗</text>
+  <text x="370" y="430" class="annotation" text-anchor="middle">declared: high_to_low</text>
+
+  <!-- Expected (correct) -->
+  <text x="130" y="460" class="label" fill="#27ae60" text-anchor="start" font-size="11">Expected:</text>
+  <line x1="180" y1="455" x2="580" y2="455" class="connector-green"/>
+  <rect x="300" y="444" width="140" height="22" rx="3" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="370" y="459" class="direction-label" fill="#27ae60">LOW → HIGH ✓</text>
+  <text x="370" y="470" class="annotation" text-anchor="middle">required: low_to_high</text>
+
+  <!-- Rule callout -->
+  <rect x="330" y="475" width="160" height="24" rx="4" fill="#fff" stroke="#c0392b" stroke-width="1"/>
+  <text x="410" y="492" class="label" fill="#c0392b" font-size="10">UPF-062 · level-shifter direction</text>
+</svg>

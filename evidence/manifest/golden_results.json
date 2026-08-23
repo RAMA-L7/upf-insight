@@ -1,0 +1,1506 @@
+[
+  {
+    "error_count": 0,
+    "file": "tests/examples/cpu_subsys/cpu_subsys_v1.upf",
+    "findings": [
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-072",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 11
+  },
+  {
+    "error_count": 3,
+    "file": "tests/examples/cpu_subsys/cpu_subsys_v2.upf",
+    "findings": [
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-061",
+        "severity": "error",
+        "subject": "PD_AO"
+      },
+      {
+        "rule": "UPF-061",
+        "severity": "error",
+        "subject": "PD_CPU"
+      },
+      {
+        "rule": "UPF-061",
+        "severity": "error",
+        "subject": "PD_IO"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-072",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 11
+  },
+  {
+    "error_count": 7,
+    "file": "tests/examples/example.broken.upf",
+    "findings": [
+      {
+        "rule": "UPF-001",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-011",
+        "severity": "error",
+        "subject": "PD_GHOST"
+      },
+      {
+        "rule": "UPF-020",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-023",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "error",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "info",
+        "subject": "PD_GHOST"
+      },
+      {
+        "rule": "UPF-045",
+        "severity": "error",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-045",
+        "severity": "info",
+        "subject": "PD_GHOST"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "error",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_BAD"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_BAD"
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 7
+  },
+  {
+    "error_count": 1,
+    "file": "tests/examples/example.design_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-042",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 6
+  },
+  {
+    "error_count": 6,
+    "file": "tests/examples/example.iso_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "error",
+        "subject": "PD_AO"
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "error",
+        "subject": "PD_SW"
+      },
+      {
+        "rule": "UPF-041",
+        "severity": "error",
+        "subject": "PD_SW"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "PD_AO"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_SW"
+      },
+      {
+        "rule": "UPF-045",
+        "severity": "error",
+        "subject": "PD_AO"
+      },
+      {
+        "rule": "UPF-046",
+        "severity": "error",
+        "subject": "PD_SW"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_SW"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 4
+  },
+  {
+    "error_count": 1,
+    "file": "tests/examples/example.ls_clamp_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-032",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "DLO"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "DLO"
+      },
+      {
+        "rule": "UPF-046",
+        "severity": "warning",
+        "subject": "DLO"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "DLO"
+      },
+      {
+        "rule": "UPF-061",
+        "severity": "error",
+        "subject": "DLO"
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 7
+  },
+  {
+    "error_count": 2,
+    "file": "tests/examples/example.pst_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-033",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-033",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-033",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-034",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-035",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 5
+  },
+  {
+    "error_count": 3,
+    "file": "tests/examples/example.pst_cross_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-037",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-038",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-042",
+        "severity": "warning",
+        "subject": "DRV"
+      },
+      {
+        "rule": "UPF-042",
+        "severity": "warning",
+        "subject": "DRV2"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 8
+  },
+  {
+    "error_count": 1,
+    "file": "tests/examples/example.ret_ls_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-032",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_LO"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_LO"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_LO"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_LO"
+      },
+      {
+        "rule": "UPF-053",
+        "severity": "warning",
+        "subject": "PD_LO"
+      },
+      {
+        "rule": "UPF-062",
+        "severity": "error",
+        "subject": "PD_HI"
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 7
+  },
+  {
+    "error_count": 0,
+    "file": "tests/examples/example.soc.upf",
+    "findings": [
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_CORE"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 7
+  },
+  {
+    "error_count": 4,
+    "file": "tests/examples/example.sw_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "vdd_ghost"
+      },
+      {
+        "rule": "UPF-024",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-070",
+        "severity": "info",
+        "subject": "vdd_ghost"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-073",
+        "severity": "info",
+        "subject": "vdd_ghost"
+      },
+      {
+        "rule": "UPF-073",
+        "severity": "error",
+        "subject": "vdd_sw"
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 3
+  },
+  {
+    "error_count": 10,
+    "file": "tests/examples/example.syn_ref_bad.upf",
+    "findings": [
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-003",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-004",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-005",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-006",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "vss"
+      },
+      {
+        "rule": "UPF-012",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-013",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-014",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-020",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-020",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-020",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD2"
+      },
+      {
+        "rule": "UPF-045",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-045",
+        "severity": "error",
+        "subject": "PD2"
+      },
+      {
+        "rule": "UPF-087",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 9
+  },
+  {
+    "error_count": 0,
+    "file": "tests/examples/flat_multidomain/flat_multidomain.upf",
+    "findings": [
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_C"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_C"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_C"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "warning",
+        "subject": "PD_C"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-072",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-072",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 25
+  },
+  {
+    "error_count": 0,
+    "file": "tests/examples/hierarchical/core_a.upf",
+    "findings": [
+      {
+        "rule": "UPF-016",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-052",
+        "severity": "warning",
+        "subject": "PD_A"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 10
+  },
+  {
+    "error_count": 0,
+    "file": "tests/examples/hierarchical/core_b.upf",
+    "findings": [
+      {
+        "rule": "UPF-016",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-042",
+        "severity": "warning",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "info",
+        "subject": "PD_B"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 4
+  },
+  {
+    "error_count": 0,
+    "file": "tests/examples/hierarchical/sram.upf",
+    "findings": [
+      {
+        "rule": "UPF-016",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-036",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "PD_SRAM"
+      }
+    ],
+    "readiness": "REVIEW_REQUIRED",
+    "warning_count": 5
+  },
+  {
+    "error_count": 2,
+    "file": "tests/examples/hierarchical/top.upf",
+    "findings": [
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "core_a/vdd_a_sw"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "core_b/vdd_b_sw"
+      },
+      {
+        "rule": "UPF-097",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-097",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-097",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-100",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-100",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-100",
+        "severity": "warning",
+        "subject": ""
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 6
+  },
+  {
+    "error_count": 52,
+    "file": "tests/examples/user_coverage_example.upf",
+    "findings": [
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-002",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "VDDH"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "VDDL"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "sw_aon_pgd_wrapper/sw_VCCH_gated"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "sw_pgd_wrapper/sw_VCCL_gated"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "\u201csw_VCCH"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "\u201csw_VCCH_gated"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "\u201csw_VCCL"
+      },
+      {
+        "rule": "UPF-010",
+        "severity": "error",
+        "subject": "\u201csw_VCCL_gated"
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-022",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-043",
+        "severity": "info",
+        "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-044",
+        "severity": "warning",
+        "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-047",
+        "severity": "warning",
+        "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-051",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "info",
+        "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-060",
+        "severity": "info",
+        "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-070",
+        "severity": "info",
+        "subject": "\u201csw_VCCH"
+      },
+      {
+        "rule": "UPF-070",
+        "severity": "info",
+        "subject": "\u201csw_VCCH_gated"
+      },
+      {
+        "rule": "UPF-070",
+        "severity": "info",
+        "subject": "\u201csw_VCCL"
+      },
+      {
+        "rule": "UPF-070",
+        "severity": "info",
+        "subject": "\u201csw_VCCL_gated"
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-071",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-073",
+        "severity": "info",
+        "subject": "\u201csw_VCCH_gated"
+      },
+      {
+        "rule": "UPF-073",
+        "severity": "info",
+        "subject": "\u201csw_VCCL_gated"
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-076",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-086",
+        "severity": "warning",
+        "subject": "isolation:pd_gated"
+      },
+      {
+        "rule": "UPF-086",
+        "severity": "warning",
+        "subject": "level_shifter:pd_gated_aon"
+      }
+    ],
+    "readiness": "BLOCKED",
+    "warning_count": 14
+  }
+]

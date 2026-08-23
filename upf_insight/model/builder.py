@@ -89,7 +89,8 @@ _LEGAL_OPTIONS = {
                      "-repeater_isolation_supply", "-update"},
     "set_isolation_control": {"-domain", "-isolation_signal", "-isolation_sense",
                               "-isolation_condition", "-update"},
-    "set_retention_control": {"-domain", "-retention_signal", "-update"},
+    "set_retention_control": {"-domain", "-retention_signal", "-save_signal",
+                              "-restore_signal", "-update"},
     "set_level_shifter_control": {"-domain", "-level_shifter_signal", "-update"},
     "set_repeater_control": {"-domain", "-repeater_signal", "-update"},
     "set_domain_supply_net": {"-primary_power_net", "-primary_ground_net", "-update"},
@@ -592,21 +593,54 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             ctl["sense"] = _get_opt(args, "-isolation_sense")
         if _get_opt(args, "-isolation_condition"):
             ctl["condition"] = _get_opt(args, "-isolation_condition")
+        # Merge onto the strategy so rules see the control signal even when
+        # the generator emits set_isolation_control as a separate command.
+        for iso in reversed(model.isolation):
+            if iso.domain == domain:
+                iso.control_signal = ctl.get("signal") or iso.control_signal
+                if ctl.get("sense"):
+                    iso.control_sense = ctl["sense"]
+                if ctl.get("condition"):
+                    iso.control_condition = ctl["condition"]
+                break
     elif cmd == "set_retention_control":
         domain = _get_opt(args, "-domain") or ""
         ctl = model.retention_controls.setdefault(domain, {})
         if _get_opt(args, "-retention_signal"):
             ctl["signal"] = _get_opt(args, "-retention_signal")
+        if _get_opt(args, "-save_signal"):
+            ctl["save_signal"] = _get_opt(args, "-save_signal")
+        if _get_opt(args, "-restore_signal"):
+            ctl["restore_signal"] = _get_opt(args, "-restore_signal")
+        # Merge onto the strategy: save/restore belong to set_retention_control
+        # in IEEE 1801, but rules read them from the strategy object.
+        for ret in reversed(model.retentions):
+            if ret.domain == domain:
+                if ctl.get("signal"):
+                    ret.control_signal = ctl["signal"]
+                if ctl.get("save_signal"):
+                    ret.save_signal = ctl["save_signal"]
+                if ctl.get("restore_signal"):
+                    ret.restore_signal = ctl["restore_signal"]
+                break
     elif cmd == "set_level_shifter_control":
         domain = _get_opt(args, "-domain") or ""
         ctl = model.level_shifter_controls.setdefault(domain, {})
         if _get_opt(args, "-level_shifter_signal"):
             ctl["signal"] = _get_opt(args, "-level_shifter_signal")
+        for ls in reversed(model.level_shifters):
+            if ls.domain == domain and ctl.get("signal"):
+                ls.control_signal = ctl["signal"]
+                break
     elif cmd == "set_repeater_control":
         domain = _get_opt(args, "-domain") or ""
         ctl = model.repeater_controls.setdefault(domain, {})
         if _get_opt(args, "-repeater_signal"):
             ctl["signal"] = _get_opt(args, "-repeater_signal")
+        for rep in reversed(model.repeaters):
+            if rep.domain == domain and ctl.get("signal"):
+                rep.control_signal = ctl["signal"]
+                break
     elif cmd == "set_equivalent":
         names = [n.strip("{}") for n in
                  (_split_opt(args, "-nets") or _split_opt(args, "-ports")
@@ -670,9 +704,17 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 dom.primary_supply_sets["primary_ground_net"] = pg
                 _track_reference(model, "supply", pg, line)
     elif cmd == "set_port_attributes":
-        targets = args[0] if args else ""
+        # Collect every leading non-option token as a target; a single
+        # command may name several ports: "set_port_attributes clk, rst,
+        # save -attribute {always_on true}".  Stopping at the first option
+        # ("-attribute") keeps option values from being mis-read as names.
         attr = _get_opt(args, "-attribute")
-        for name in targets.replace(",", " ").split():
+        targets: List[str] = []
+        for tok in args:
+            if tok.startswith("-"):
+                break
+            targets.append(tok)
+        for name in " ".join(targets).replace(",", " ").split():
             if not name:
                 continue
             model.port_attributes.setdefault(name, []).append(attr or "")

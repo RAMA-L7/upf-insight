@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rule Catalog — UPF-Insight</title>
+  <meta name="description" content="All 74 deterministic UPF validation rules: codes, layers, severities and what each one proves about your IEEE 1801 power-intent.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <section class="page-hero container">
+    <span class="eyebrow reveal">Rule catalog</span>
+    <h1 class="reveal" style="--reveal-delay:80ms"><span data-count="74">74</span> rules.<br><span class="grad-text">Zero ambiguity.</span></h1>
+    <p class="reveal" style="--reveal-delay:160ms">
+      This is the complete, canonical rule set — generated directly from the engine's
+      registry. Each code is stable across releases and cited in every finding.
+    </p>
+  </section>
+
+  <section class="section container" style="padding-top:24px;">
+    <div class="rules-toolbar reveal">
+      <input type="search" id="rule-search" placeholder="Search code or title…  (e.g. UPF-04, isolation)" aria-label="Search rules">
+      <select id="rule-layer" aria-label="Filter by layer">
+        <option value="">All layers</option>
+        <option>SYNTAX</option>
+        <option>REFERENCE</option>
+        <option>SUPPLY_DOMAIN</option>
+        <option>PST</option>
+        <option>STRATEGY</option>
+        <option>DESIGN</option>
+        <option>SUPPLY</option>
+      </select>
+      <select id="rule-severity" aria-label="Filter by severity">
+        <option value="">All severities</option>
+        <option value="error">error</option>
+        <option value="warning">warning</option>
+        <option value="info">info</option>
+      </select>
+    </div>
+    <div id="rules-list" aria-live="polite">
+      <div class="mono" style="color:var(--text-3); padding:30px 4px;">loading registry…</div>
+    </div>
+    <p class="mono" id="rules-count" style="color:var(--text-3); font-size:12.5px; margin-top:18px;"></p>
+  </section>
+
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script>
+    (() => {
+      const list = document.getElementById("rules-list");
+      const count = document.getElementById("rules-count");
+      const search = document.getElementById("rule-search");
+      const layer = document.getElementById("rule-layer");
+      const severity = document.getElementById("rule-severity");
+      let RULES = [];
+
+      const esc = s => s.replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+      function render() {
+        const q = search.value.trim().toLowerCase();
+        const L = layer.value, S = severity.value;
+        const rows = RULES.filter(r =>
+          (!L || r.category === L) &&
+          (!S || r.severity === S) &&
+          (!q || r.code.toLowerCase().includes(q) || r.title.toLowerCase().includes(q)));
+        list.innerHTML = rows.map(r => `
+          <div class="rule-row">
+            <span class="rule-code">${esc(r.code)}</span>
+            <span class="chip ${esc(r.severity)}">${esc(r.severity)}</span>
+            <span class="rule-layer">${esc(r.category)}</span>
+            <span class="rule-title">${esc(r.title)}</span>
+          </div>`).join("") ||
+          `<div style="color:var(--text-3); padding:26px 4px;">no rules match this filter</div>`;
+        count.textContent = `showing ${rows.length} / ${RULES.length} rules`;
+      }
+
+      fetch("assets/data/rules.json")
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(data => { RULES = data; render(); })
+        .catch(() => {
+          list.innerHTML =
+            `<div style="color:var(--warn); padding:26px 4px;">registry unavailable —
+             serve this folder over HTTP to load the catalog.</div>`;
+        });
+
+      for (const el of [search, layer, severity]) el.addEventListener("input", render);
+    })();
+  </script>
+</body>
+</html>

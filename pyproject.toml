@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "upf-insight"
-version = "0.2.0"
+version = "0.3.0"
 description = "UPF-Insight — deterministic power-intent intelligence for IEEE 1801 (UPF): validate, model, analyze and diff UPF files before power-aware implementation. No EDA tool and no LLM required."
 readme = "README.md"
 license = "MIT"   # PEP 639 SPDX expression; LICENSE file ships via license-files
@@ -41,6 +41,7 @@ all = ["pre-commit>=3.0", "pytest>=7.0"]
 [project.scripts]
 upf-insight = "upf_insight.cli.cli:main"
 upfi = "upf_insight.cli.cli:main"
+upf-insight-mcp = "upf_insight.api.mcp_server:serve"
 
 [tool.setuptools]
 license-files = ["LICENSE"]
@@ -51,6 +52,7 @@ include = ["upf_insight*"]
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.upf", "*.tcl"]
 "upf_insight.workspace.webui" = ["index.html", "assets/css/*", "assets/js/*"]
+"upf_insight.business_site" = ["*.html", "features/*.html"]
 "upf_insight.evidence.manifest" = ["*.json"]
 "upf_insight.examples" = ["*.upf", "*.yaml"]
 

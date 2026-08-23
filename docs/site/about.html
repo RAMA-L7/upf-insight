@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About — UPF-Insight</title>
+  <meta name="description" content="UPF-Insight is built on one principle: deterministic, evidence-backed power-intent analysis. No LLMs in the analysis path. Honest support boundaries.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <section class="page-hero container">
+    <span class="eyebrow reveal">About</span>
+    <h1 class="reveal" style="--reveal-delay:80ms">Power intent deserves<br><span class="grad-text">the same rigor as RTL.</span></h1>
+    <p class="reveal" style="--reveal-delay:160ms">
+      UPF-Insight is the power-intent sibling of the Ṛta / sdc-tools constraint
+      validator — a family of tools that treat design intent as a first-class,
+      verifiable artifact.
+    </p>
+  </section>
+
+  <section class="section container">
+    <div class="grid grid-3 stagger">
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">∅</div>
+        <h3>No LLMs in the analysis path</h3>
+        <p>The engine is a deterministic parser, model builder and rule dispatcher.
+        Identical input always yields the identical verdict — on your machine,
+        today and five years from now.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">⌖</div>
+        <h3>Every finding traces to a line</h3>
+        <p>Rule codes UPF-001… carry provenance: file, line number, layer and
+        severity. You can act on every report without hunting for context.</p>
+      </div>
+      <div class="card spotlight tilt" data-tilt="6">
+        <div class="card-icon">◫</div>
+        <h3>Honest support boundaries</h3>
+        <p>"No errors" never means "power proven correct". Results carry explicit
+        trust statuses so you always know what was checked — and what wasn't.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:48px; align-items:center;">
+      <div class="reveal">
+        <span class="eyebrow">How it works</span>
+        <h2 style="font-size:clamp(24px,3vw,34px); font-weight:800; letter-spacing:-0.03em; margin-bottom:18px;">
+          Three deterministic stages
+        </h2>
+        <ol style="color:var(--text-2); font-size:15px; display:grid; gap:16px; padding-left:20px;">
+          <li><b style="color:var(--text-1)">Preprocess.</b> Tcl/UPF source becomes a typed command stream — malformed syntax caught at the door (UPF-006).</li>
+          <li><b style="color:var(--text-1)">Build.</b> The command stream constructs a power-intent object graph: domains, supply sets, strategies, switches, PSTs.</li>
+          <li><b style="color:var(--text-1)">Dispatch.</b> 74 registered rules run against the graph. Handler exceptions are contained; findings are sorted deterministically.</li>
+        </ol>
+      </div>
+      <div class="card spotlight reveal" data-tilt="4">
+        <h3 style="margin-bottom:14px;">Milestones</h3>
+        <ul style="list-style:none; display:grid; gap:14px; color:var(--text-2); font-size:14.5px;">
+          <li><span class="mono" style="color:var(--accent);">v0.1</span> — engine core, first rule layers, CLI</li>
+          <li><span class="mono" style="color:var(--accent);">v0.2</span> — PST analysis, baselines &amp; CI gates, semantic diff</li>
+          <li><span class="mono" style="color:var(--accent);">v0.2.4</span> — 74 rules, netlist-context rules, workspace UI</li>
+          <li><span class="mono" style="color:var(--text-3);">next</span> — deeper hierarchy verification, policy packs</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div class="cta-band reveal">
+      <h2>Put the engine to work on your UPF</h2>
+      <p>Free Community edition. Launch the workspace or browse every rule first.</p>
+      <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-lg" data-launch type="button">Launch Workspace</button>
+        <a class="btn btn-ghost btn-lg" href="rules.html">Rule Catalog</a>
+      </div>
+    </div>
+  </section>
+
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

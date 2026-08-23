@@ -481,6 +481,33 @@ def _domain_by_name(model: PowerIntentModel, name: str):
     return model.domains.get(key) or model.domains.get(name)
 
 
+@_register("UPF-039")
+def _impossible_pst_state(model: PowerIntentModel):
+    """A PST row where a switch output is ON while its input is OFF.
+
+    A power switch cannot produce power from a dead input. If a PST state
+    declares the switch output ON but the input supply OFF, the state is
+    physically impossible - it models power appearing out of nowhere.
+    """
+    findings = []
+    for pst in model.psts.values():
+        for state in pst.states:
+            for sw in model.switches.values():
+                if not (sw.input_supply and sw.output_supply):
+                    continue
+                inp = state.supply_states.get(sw.input_supply)
+                out = state.supply_states.get(sw.output_supply)
+                if out == "ON" and inp == "OFF":
+                    findings.append(Finding(
+                        rule="UPF-039", severity="error",
+                        message=f"PST '{pst.name}' state '{state.name}' declares "
+                                f"switch output '{sw.output_supply}' ON while "
+                                f"its input supply '{sw.input_supply}' is OFF - "
+                                f"physically impossible power state.",
+                        line=state.declared_line))
+    return findings
+
+
 @_register("UPF-040")
 def _isolation_non_always_on(model: PowerIntentModel):
     """Isolation supply must be always-on.
@@ -501,7 +528,7 @@ def _isolation_non_always_on(model: PowerIntentModel):
                 message=f"Isolation for domain '{iso.domain}' uses unknown "
                         f"isolation supply '{iso.isolation_supply}' - cannot be "
                         f"guaranteed always-on.",
-                line=iso.declared_line))
+                line=iso.declared_line, subject=iso.domain))
         else:
             # Resolve a supply set through its power function to the net, so
             # switchability (vs power-switch outputs) is exact.
@@ -516,14 +543,14 @@ def _isolation_non_always_on(model: PowerIntentModel):
                     message=f"Isolation supply '{iso.isolation_supply}' is a "
                             f"power-switch output (can power down); it must be "
                             f"always-on.",
-                    line=iso.declared_line))
+                    line=iso.declared_line, subject=iso.domain))
             else:
                 findings.append(Finding(
                     rule="UPF-040", severity="warning",
                     message=f"Isolation supply '{iso.isolation_supply}' always-on "
                             f"status must be confirmed against the PST / supply "
                             f"states.",
-                    line=iso.declared_line, support="PARTIAL"))
+                    line=iso.declared_line, support="PARTIAL", subject=iso.domain))
     return findings
 
 
@@ -545,7 +572,7 @@ def _isolation_self_in_switchable(model: PowerIntentModel):
                 message=f"Isolation for domain '{iso.domain}' is located 'self' "
                         f"but the domain's primary supply '{primary}' is "
                         f"switchable - isolation cells would lose power.",
-                line=iso.declared_line))
+                line=iso.declared_line, subject=iso.domain))
     return findings
 
 
@@ -569,7 +596,8 @@ def _missing_isolation_crossing(model: PowerIntentModel):
                 message=f"Switchable domain '{dom.name}' has no isolation "
                         f"strategy - crossings may leak; confirm against the "
                         f"netlist.",
-                line=dom.declared_line, support="NETLIST_REQUIRED"))
+                line=dom.declared_line, support="NETLIST_REQUIRED",
+                subject=dom.name))
     return findings
 
 
@@ -588,7 +616,7 @@ def _redundant_isolation(model: PowerIntentModel):
                 rule="UPF-043", severity="info",
                 message=f"Isolation on domain '{iso.domain}' is redundant - "
                         f"primary supply '{primary}' is not switchable.",
-                line=iso.declared_line))
+                line=iso.declared_line, subject=iso.domain))
     return findings
 
 
@@ -604,7 +632,8 @@ def _isolation_missing_inout(model: PowerIntentModel):
                 message=f"Isolation for domain '{iso.domain}' does not cover "
                         f"inouts (-applies_to '{iso.applies_to}'); bidirectional "
                         f"crossings may leak.",
-                line=iso.declared_line, support="NETLIST_REQUIRED"))
+                line=iso.declared_line, support="NETLIST_REQUIRED",
+                subject=iso.domain))
     return findings
 
 
@@ -617,7 +646,7 @@ def _isolation_without_control(model: PowerIntentModel):
                 rule="UPF-045", severity="error",
                 message=f"Isolation for domain '{iso.domain}' has no "
                         f"set_isolation_control (missing -isolation_signal).",
-                line=iso.declared_line))
+                line=iso.declared_line, subject=iso.domain))
     return findings
 
 
@@ -638,7 +667,7 @@ def _invalid_clamp_value(model: PowerIntentModel):
                 message=f"Isolation for domain '{iso.domain}' has no "
                         f"-clamp_value; its outputs are undefined (floating) "
                         f"while isolation is active.",
-                line=iso.declared_line))
+                line=iso.declared_line, subject=iso.domain))
             continue
         val = iso.clamp_value.strip()
         if val in ("0", "1"):
@@ -650,7 +679,7 @@ def _invalid_clamp_value(model: PowerIntentModel):
             message=f"Isolation for domain '{iso.domain}' uses clamp value "
                     f"'{iso.clamp_value}' - must be 0, 1, or a declared supply "
                     f"state.",
-            line=iso.declared_line))
+            line=iso.declared_line, subject=iso.domain))
     return findings
 
 
@@ -676,7 +705,7 @@ def _isolation_control_not_always_on(model: PowerIntentModel):
             message=f"Isolation control '{iso.control_signal}' for domain "
                     f"'{iso.domain}' must be always-on; confirm it is not "
                     f"powered down.",
-            line=iso.declared_line, support="PARTIAL"))
+            line=iso.declared_line, support="PARTIAL", subject=iso.domain))
     return findings
 
 
@@ -698,14 +727,15 @@ def _retention_supply_powers_down(model: PowerIntentModel):
                     rule="UPF-050", severity="error",
                     message=f"Retention supply '{ret.retention_supply}' is not "
                             f"declared anywhere; cannot be always-on.",
-                    line=ret.declared_line))
+                    line=ret.declared_line, subject=ret.domain))
             else:
                 findings.append(Finding(
                     rule="UPF-050", severity="warning",
                     message=f"Retention supply '{ret.retention_supply}' always-on "
                             f"status must be confirmed against the PST / supply "
                             f"states (requires power-state analysis).",
-                    line=ret.declared_line, support="PARTIAL"))
+                    line=ret.declared_line, support="PARTIAL",
+                    subject=ret.domain))
     return findings
 
 
@@ -715,7 +745,7 @@ def _retention_without_elements(model: PowerIntentModel):
         Finding(rule="UPF-052", severity="warning",
                 message=f"set_retention for domain '{ret.domain}' references no "
                         f"retention elements (-elements empty).",
-                line=ret.declared_line)
+                line=ret.declared_line, subject=ret.domain)
         for ret in model.retentions
         if not ret.elements
     ]
@@ -736,29 +766,70 @@ def _retention_control_not_always_on(model: PowerIntentModel):
     for ret in model.retentions:
         for sig, label in ((ret.save_signal, "save"),
                            (ret.restore_signal, "restore")):
-            if sig and sig not in always_on:
+            if not sig:
+                continue
+            # Control may be a bare name or a ``{name sense}`` pair;
+            # compare the signal name, not the raw token.
+            name = _retention_signal_pair(sig)[0]
+            if name and name not in always_on:
                 findings.append(Finding(
                     rule="UPF-051", severity="warning",
                     message=f"Retention {label} control '{sig}' for domain "
                             f"'{ret.domain}' must be always-on; confirm it is "
                             f"not powered down.",
-                    line=ret.declared_line, support="PARTIAL"))
+                    line=ret.declared_line, support="PARTIAL",
+                    subject=ret.domain))
     return findings
+
+
+def _retention_signal_pair(value: str) -> tuple:
+    """Parse a retention control token that may be a bare name or a
+    ``{name sense}`` pair (e.g. ``{save high}``) into (name, sense).
+    Bare names have no explicit sense (None)."""
+    v = value.strip()
+    if v.startswith("{") and v.endswith("}"):
+        inner = v[1:-1].strip()
+        parts = inner.split()
+        if len(parts) >= 2:
+            return parts[0], parts[1]
+        return parts[0], None
+    return v, None
 
 
 @_register("UPF-053")
 def _retention_control_tied_constant(model: PowerIntentModel):
-    """Save and restore driven by the same signal can never toggle both roles."""
+    """Save and restore driven by the same signal with the same sense can
+    never toggle both roles.
+
+    The canonical IEEE 1801 pattern uses one signal with opposite senses
+    (``-save_signal {ret_en high} -restore_signal {ret_en low}``). Tying the
+    same signal with the same sense - or the identical bare token - makes the
+    control unable to sequence."""
     findings = []
     for ret in model.retentions:
-        if ret.save_signal and ret.restore_signal and \
-                ret.save_signal == ret.restore_signal:
-            findings.append(Finding(
-                rule="UPF-053", severity="warning",
-                message=f"Retention for domain '{ret.domain}' ties save and "
-                        f"restore to the same signal '{ret.save_signal}' - "
-                        f"the control can never sequence correctly.",
-                line=ret.declared_line, support="PARTIAL"))
+        if not (ret.save_signal and ret.restore_signal):
+            continue
+        s_name, s_sense = _retention_signal_pair(ret.save_signal)
+        r_name, r_sense = _retention_signal_pair(ret.restore_signal)
+        if s_name == r_name:
+            if s_sense is None and r_sense is None:
+                # same bare signal for both roles - can never toggle
+                findings.append(Finding(
+                    rule="UPF-053", severity="warning",
+                    message=f"Retention for domain '{ret.domain}' ties save and "
+                            f"restore to the same signal '{s_name}' - the "
+                            f"control can never sequence correctly.",
+                    line=ret.declared_line, support="PARTIAL",
+                    subject=ret.domain))
+            elif s_sense == r_sense:
+                findings.append(Finding(
+                    rule="UPF-053", severity="error",
+                    message=f"Retention for domain '{ret.domain}' drives save "
+                            f"and restore from '{s_name}' with the same sense "
+                            f"'{s_sense}' - the control can never sequence; "
+                            f"use opposite senses (e.g. save high / restore "
+                            f"low).",
+                    line=ret.declared_line, subject=ret.domain))
     return findings
 
 
@@ -770,7 +841,7 @@ def _retention_without_control(model: PowerIntentModel):
                 message=f"Retention for domain '{ret.domain}' has no "
                         f"set_retention_control (missing -save_signal / "
                         f"-restore_signal).",
-                line=ret.declared_line)
+                line=ret.declared_line, subject=ret.domain)
         for ret in model.retentions
         if not ret.save_signal and not ret.restore_signal
         and not ret.control_signal
@@ -781,17 +852,37 @@ def _retention_without_control(model: PowerIntentModel):
 def _unnecessary_level_shifter(model: PowerIntentModel):
     """Equal-voltage crossings need no level shifter.
 
-    Voltage information comes from supply states; without a full PST this is
-    flagged at info level as an advisory.
+    When the shifter's domain voltage and at least one other domain voltage
+    are known and equal, the shifter is unnecessary (warning). When voltages
+    are unknown this stays an info-level advisory.
     """
-    return [
-        Finding(rule="UPF-060", severity="info",
+    findings = []
+    voltages: Dict[str, Optional[float]] = {
+        dom.name: _domain_voltage(model, dom) for dom in model.domains.values()}
+    for ls in model.level_shifters:
+        v = voltages.get(ls.domain)
+        if v is None:
+            findings.append(Finding(
+                rule="UPF-060", severity="info",
                 message=f"Level shifter on domain '{ls.domain}' - verify the "
                         f"source/target voltages differ; equal voltages need no "
                         f"shifter.",
-                line=ls.declared_line, support="PARTIAL")
-        for ls in model.level_shifters
-    ]
+                line=ls.declared_line, support="PARTIAL",
+                subject=ls.domain))
+            continue
+        for other, ov in voltages.items():
+            if other == ls.domain or ov is None:
+                continue
+            if abs(v - ov) < 1e-9:
+                findings.append(Finding(
+                    rule="UPF-060", severity="warning",
+                    message=f"Level shifter on domain '{ls.domain}' ({v}V) - "
+                            f"domain '{other}' has equal voltage ({ov}V); the "
+                            f"shifter is unnecessary.",
+                    line=ls.declared_line, support="PARTIAL",
+                    subject=ls.domain))
+                break
+    return findings
 
 
 def _supply_voltage(model: PowerIntentModel, supply: str) -> Optional[float]:
@@ -859,7 +950,8 @@ def _missing_level_shifter(model: PowerIntentModel):
                     message=f"Domains '{dom.name}' ({v}V) and '{other.name}' "
                             f"({ov}V) differ in voltage but neither declares a "
                             f"level shifter.",
-                    line=dom.declared_line, support="PARTIAL"))
+                    line=dom.declared_line, support="PARTIAL",
+                    subject=dom.name))
     return findings
 
 
@@ -892,7 +984,8 @@ def _wrong_level_shifter_rule(model: PowerIntentModel):
                     message=f"Level shifter on domain '{dom.name}' ({v}V) to "
                             f"'{other.name}' ({ov}V) declares rule "
                             f"'{ls.rule}' but needs '{correct}'.",
-                    line=ls.declared_line, support="PARTIAL"))
+                    line=ls.declared_line, support="PARTIAL",
+                    subject=ls.domain))
                 break
     return findings
 
@@ -915,7 +1008,7 @@ def _ls_self_in_switchable(model: PowerIntentModel):
                 message=f"Level shifter on domain '{ls.domain}' is located "
                         f"'self' but the domain's primary supply '{primary}' "
                         f"is switchable - the shifter would lose power.",
-                line=ls.declared_line))
+                line=ls.declared_line, subject=ls.domain))
     return findings
 
 
@@ -937,7 +1030,7 @@ def _ls_control_not_always_on(model: PowerIntentModel):
             message=f"Level-shifter control '{ls.control_signal}' for domain "
                     f"'{ls.domain}' must be always-on; confirm it is not "
                     f"powered down.",
-            line=ls.declared_line, support="PARTIAL"))
+            line=ls.declared_line, support="PARTIAL", subject=ls.domain))
     return findings
 
 
@@ -967,7 +1060,7 @@ def _switch_undefined_supply(model: PowerIntentModel):
                     rule="UPF-070", severity="error",
                     message=f"Power switch '{sw.name}' references undefined "
                             f"{label} supply '{ref}'.",
-                    line=sw.declared_line))
+                    line=sw.declared_line, subject=ref))
     return findings
 
 
@@ -1012,7 +1105,14 @@ def _always_on_into_switchable(model: PowerIntentModel):
 
 @_register("UPF-073")
 def _switch_output_unused(model: PowerIntentModel):
-    """A switch output supply not consumed by any domain is dead."""
+    """A switch output supply not consumed by any domain is dead.
+
+    The whole point of a power switch is to gate the supply feeding a
+    switchable domain. If no domain consumes the output, the switched supply
+    is dead: either the domain is wired to the wrong net (power intent broken)
+    or the switch is orphaned. Either way this is a real defect, not an
+    advisory.
+    """
     findings = []
     used = set()
     for dom in model.domains.values():
@@ -1022,9 +1122,149 @@ def _switch_output_unused(model: PowerIntentModel):
     for key, sw in model.switches.items():
         if sw.output_supply and sw.output_supply not in used:
             findings.append(Finding(
-                rule="UPF-073", severity="info",
+                rule="UPF-073", severity="error",
                 message=f"Power switch '{sw.name}' output supply "
-                        f"'{sw.output_supply}' is not used by any power domain.",
+                        f"'{sw.output_supply}' is not used by any power domain - "
+                        f"the switchable domain is not powered by the switch "
+                        f"output.",
+                line=sw.declared_line, subject=sw.output_supply))
+    return findings
+
+
+@_register("UPF-076")
+def _switch_missing_off_state(model: PowerIntentModel):
+    """A power switch without an off-state can never power down its domain.
+
+    The on-state alone makes the switchable supply always-on in effect: there
+    is no declared state where the output is OFF. Without an off-state the
+    domain cannot be gated, which defeats the purpose of the switch.
+    """
+    findings = []
+    for key, sw in model.switches.items():
+        if not sw.off_state:
+            findings.append(Finding(
+                rule="UPF-076", severity="error",
+                message=f"Power switch '{sw.name}' declares an on-state but no "
+                        f"off-state - the domain can never power down.",
+                line=sw.declared_line))
+    return findings
+
+
+@_register("UPF-077")
+def _switch_without_control(model: PowerIntentModel):
+    """A power switch with no control port can never be toggled.
+
+    IEEE 1801 switches are controlled through ``-control_port``; without one
+    there is no signal that can turn the switch on or off, so the switchable
+    domain cannot actually be gated.
+    """
+    findings = []
+    for key, sw in model.switches.items():
+        if not sw.control_port:
+            findings.append(Finding(
+                rule="UPF-077", severity="error",
+                message=f"Power switch '{sw.name}' declares no control port - "
+                        f"the switch can never be toggled.",
+                line=sw.declared_line))
+    return findings
+
+
+@_register("UPF-078")
+def _retention_without_supply(model: PowerIntentModel):
+    """Retention on a switchable domain must name a retention supply.
+
+    If the domain's own primary supply is a switched (non-always-on) supply,
+    retention without an explicit always-on retention supply cannot preserve
+    state through power-down.
+    """
+    findings = []
+    switched = _switchable_outputs(model)
+    for ret in model.retentions:
+        if ret.retention_supply:
+            continue
+        dom = _domain_by_name(model, ret.domain)
+        primary = _domain_primary_power(model, dom) if dom else None
+        if primary and primary in switched:
+            findings.append(Finding(
+                rule="UPF-078", severity="error",
+                message=f"Retention on switchable domain '{ret.domain}' names "
+                        f"no retention supply - state cannot be preserved "
+                        f"through power-down.",
+                line=ret.declared_line, subject=ret.domain))
+    return findings
+
+
+@_register("UPF-079")
+def _ls_threshold_out_of_range(model: PowerIntentModel):
+    """A level-shifter threshold outside every known supply voltage is
+    implausible for the crossing it is declared to serve.
+
+    The threshold sits between the source and target rails; a threshold below
+    or above all declared supply voltages cannot be a valid trip point for any
+    known crossing.
+    """
+    findings = []
+    known = [v for v in (_supply_voltage(model, s.name) for s in model.supply_nets.values())
+             if v is not None]
+    if not known:
+        return findings
+    lo, hi = min(known), max(known)
+    for ls in model.level_shifters:
+        if ls.threshold is None:
+            continue
+        if ls.threshold < lo - 1e-9 or ls.threshold > hi + 1e-9:
+            findings.append(Finding(
+                rule="UPF-079", severity="warning",
+                message=f"Level shifter on domain '{ls.domain}' declares "
+                        f"threshold {ls.threshold}V outside the known supply "
+                        f"voltage range [{lo}V, {hi}V].",
+                line=ls.declared_line, support="PARTIAL"))
+    return findings
+
+
+@_register("UPF-065")
+def _ground_on_switched_supply(model: PowerIntentModel):
+    """A domain's primary ground net must not be a power-switch output.
+
+    The ground reference of a domain is, by definition, the always-on low
+    rail. A switch output is a gated power rail: wiring it as the domain
+    ground would float the reference when the switch opens.
+    """
+    findings = []
+    switched = _switchable_outputs(model)
+    for dom in model.domains.values():
+        ground = dom.primary_supply_sets.get("primary_ground_net")
+        if ground and ground in switched:
+            findings.append(Finding(
+                rule="UPF-065", severity="error",
+                message=f"Domain '{dom.name}' uses switch output "
+                        f"'{ground}' as primary ground - the ground reference "
+                        f"must be an always-on low rail.",
+                line=dom.declared_line))
+    return findings
+
+
+@_register("UPF-075")
+def _switch_on_off_same_condition(model: PowerIntentModel):
+    """A switch whose on and off state conditions are identical can never
+    toggle - it is either always on or always off.
+
+    ``-on_state {on {vdd} {pwr_en}}`` and
+    ``-off_state {off {vdd} {pwr_en}}`` (same condition) mean both states
+    are satisfied by the same control value: the switch cannot change state.
+    """
+    findings = []
+    for key, sw in model.switches.items():
+        on_cond = " ".join(sw.on_state_condition).strip()
+        off_cond = " ".join(sw.off_state_condition).strip()
+        if not on_cond or not off_cond:
+            continue
+        if on_cond == off_cond:
+            findings.append(Finding(
+                rule="UPF-075", severity="error",
+                message=f"Power switch '{sw.name}' on-state condition "
+                        f"'{on_cond}' is identical to its off-state condition "
+                        f"- the switch can never toggle.",
                 line=sw.declared_line))
     return findings
 
@@ -1067,7 +1307,8 @@ def _undefined_supply_reference(model: PowerIntentModel):
         Finding(rule="UPF-010", severity="error",
                 message=f"Supply '{r['name']}' is referenced but never defined "
                         f"as a net, port or set.",
-                line=r["line"], support="VALIDATED")
+                line=r["line"], support="VALIDATED",
+                subject=r["name"])
         for r in model.references
         if r["kind"] == "supply" and r["key"] not in defined
     ]
@@ -1176,7 +1417,7 @@ def _undefined_domain_references(model: PowerIntentModel):
         Finding(rule="UPF-011", severity="error",
                 message=f"Power domain '{name}' is referenced by a strategy but "
                         f"never created.",
-                support="VALIDATED")
+                support="VALIDATED", subject=name)
         for name in sorted(referenced - defined)
     ]
 
@@ -1583,6 +1824,44 @@ def _loaded_upf_missing(model: PowerIntentModel):
                         f"validated input files - hierarchy is unresolved.",
                 line=ev.get("line")))
     return findings
+
+
+# ---------------------------------------------------------------------------
+# Strategy interactions (UPF-085/086) and wildcard specificity (UPF-087)
+# ---------------------------------------------------------------------------
+
+@_register("UPF-085")
+def _duplicate_strategy(model: PowerIntentModel):
+    from ..analysis.strategy_interactions import analyze_strategy_interactions
+
+    return [i.finding for i in analyze_strategy_interactions(model).interactions
+            if i.code == "UPF-085" and i.finding is not None]
+
+
+@_register("UPF-086")
+def _strategy_conflict(model: PowerIntentModel):
+    from ..analysis.strategy_interactions import analyze_strategy_interactions
+
+    return [i.finding for i in analyze_strategy_interactions(model).interactions
+            if i.code == "UPF-086" and i.finding is not None]
+
+
+@_register("UPF-087")
+def _wildcard_specificity(model: PowerIntentModel):
+    from ..analysis.wildcard_analyzer import analyze_wildcards
+
+    return [
+        Finding(
+            rule="UPF-087",
+            severity="warning" if a.risk_level == "HIGH" else "info",
+            message=f"low-specificity wildcard '{a.pattern}' used for "
+                    f"{a.context} (specificity {a.specificity:.2f}, risk "
+                    f"{a.risk_score}/10 {a.risk_level}) - matches resolve at "
+                    f"elaboration time and may drift.",
+        )
+        for a in analyze_wildcards(model).assessments
+        if a.risk_level != "LOW"
+    ]
 
 
 def build_rule_handlers():

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UPF-Insight — Deterministic Power-Intent Intelligence for IEEE 1801</title>
+  <meta name="description" content="Validate, model and diff IEEE 1801 (UPF) power-intent before implementation. Deterministic, offline, evidence-backed. Every finding traces to a line.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <!-- ═══════════ HERO ═══════════ -->
+  <section class="hero container">
+    <div class="hero-copy">
+      <span class="hero-badge reveal"><span class="pulse-dot"></span> v0.2.4 · IEEE 1801 / UPF 2.1–4.0</span>
+      <h1 class="reveal" style="--reveal-delay:80ms">
+        Power intent,<br>proven <span class="grad-text">before silicon</span>.
+      </h1>
+      <p class="hero-sub reveal" style="--reveal-delay:160ms">
+        UPF-Insight validates, models and diffs your IEEE&nbsp;1801 power-intent files
+        with a deterministic engine — no EDA tool, no LLM in the analysis path.
+        Every finding carries a rule code and a line number.
+      </p>
+      <div class="hero-actions reveal" style="--reveal-delay:240ms">
+        <button class="btn btn-primary btn-lg" data-launch type="button">
+          Launch Workspace
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg>
+        </button>
+        <a class="btn btn-ghost btn-lg" href="product.html">Explore capabilities</a>
+      </div>
+      <div class="hero-trust reveal stagger" style="--reveal-delay:320ms">
+        <div class="trust-item"><b data-count="74">0</b><span>deterministic rules across 7 layers</span></div>
+        <div class="trust-item"><b data-count="100" >0</b><span>% local — zero cloud, zero telemetry</span></div>
+        <div class="trust-item"><b data-count="4">0</b><span>UPF versions supported (2.1 → 4.0)</span></div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <canvas id="hero-canvas" aria-label="Interactive 3D model of a silicon die with glowing power domains — drag to rotate"></canvas>
+      <span class="hero-visual-hint">◈ drag to rotate · scroll to zoom</span>
+    </div>
+
+    <div class="scroll-cue" aria-hidden="true"></div>
+  </section>
+
+  <!-- ═══════════ PROOF / TERMINAL ═══════════ -->
+  <section class="section container">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:48px; align-items:center;">
+      <div class="reveal">
+        <span class="eyebrow">Evidence, not vibes</span>
+        <h2 style="font-size:clamp(26px,3.2vw,38px); font-weight:800; letter-spacing:-0.03em; margin-bottom:16px;">
+          One command from UPF file to verdict
+        </h2>
+        <p style="color:var(--text-2); margin-bottom:20px;">
+          The engine parses your Tcl/UPF into a command stream, builds a power-intent
+          object graph, then dispatches 74 deterministic rules against it. Findings are
+          sorted by severity, gated by policy, and exportable for CI — text, JSON,
+          JUnit or a self-contained HTML report.
+        </p>
+        <ul style="list-style:none; color:var(--text-2); font-size:14.5px; display:grid; gap:10px;">
+          <li>▸ Line-level provenance on every finding</li>
+          <li>▸ Baseline snapshots + gate policies (<span class="mono" style="color:var(--accent)">--baseline --gate STRICT</span>)</li>
+          <li>▸ Semantic diff between UPF revisions</li>
+          <li>▸ Power State Table reachability analysis</li>
+        </ul>
+      </div>
+      <div class="terminal reveal" data-tilt="5">
+        <div class="terminal-bar">
+          <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+          <span class="terminal-title">upf-insight — deterministic validation</span>
+        </div>
+        <div class="terminal-body" data-script='[
+          ["tl-dim",   "$ upf-insight check soc.upf --gate BLOCKERS_ONLY", 500],
+          ["tl-info",  "preprocess : 214 commands · 0 malformed", 300],
+          ["tl-info",  "model      : 6 domains · 11 supply sets · PST 3×4", 300],
+          ["tl-err",   "UPF-041 [error] isolation cell inside switchable domain", 220],
+          ["tl-dim",   "           ↳ soc.upf:87  upf_isolate -applies_to outputs", 260],
+          ["tl-warn",  "UPF-032 [warn]  domain PD_GPU has no Power State Table", 220],
+          ["tl-ok",    "verdict    : 1 error · 1 warning · gate FAILED (exit 1)", 400],
+          ["tl-dim",   "# every finding traces to its line. deterministically.", 0]
+        ]'></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CAPABILITIES ═══════════ -->
+  <section class="section container">
+    <div class="section-head reveal">
+      <span class="eyebrow">Capabilities</span>
+      <h2>The whole power-intent workflow, pre-implementation</h2>
+      <p>Catch power bugs while they are still one-line fixes — before synthesis, before signoff, before silicon.</p>
+    </div>
+    <div class="grid grid-3 stagger">
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#validate" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">⬡</div>
+        <h3>Deterministic Validation</h3>
+        <p>74 rules across syntax, references, supply domains, PST, isolation, retention, level shifters and power switches. Same input, same verdict — always.</p>
+      </a>
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#pst" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">▦</div>
+        <h3>PST Analysis</h3>
+        <p>Power State Table reachability: impossible states, unreachable rows, undeclared transitions, un-isolated crossings — computed, not guessed.</p>
+      </a>
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#diff" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">⇄</div>
+        <h3>Semantic Diff</h3>
+        <p>Compare two UPF revisions at the model level. See added or dropped domains, changed strategies and supply rewiring — not textual noise.</p>
+      </a>
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#coverage" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">◎</div>
+        <h3>Structural Coverage</h3>
+        <p>Domain and supply coverage metrics expose which corners of your power architecture the UPF never actually describes.</p>
+      </a>
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#ci" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">⚙</div>
+        <h3>CI Gates &amp; Baselines</h3>
+        <p>Save result baselines and enforce regression policies. Exit-code contract plugs straight into any pipeline. JUnit output included.</p>
+      </a>
+      <a class="card spotlight tilt" data-tilt="7" href="product.html#generate" style="text-decoration:none; color:inherit;">
+        <div class="card-icon">✦</div>
+        <h3>Skeleton Generation</h3>
+        <p>Scaffold standards-correct UPF for new designs: domains, supply sets, isolation, retention and switches — ready to refine.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- ═══════════ PHILOSOPHY BAND ═══════════ -->
+  <section class="section container">
+    <div class="cta-band reveal">
+      <span class="eyebrow">The honesty principle</span>
+      <h2>"No errors" ≠ "power proven correct"</h2>
+      <p>Every result carries an explicit trust boundary — VALIDATED, PARTIAL or UNSUPPORTED.<br>You always know exactly what was checked, and what was not.</p>
+      <a class="btn btn-primary btn-lg" href="about.html">Read our philosophy</a>
+    </div>
+  </section>
+
+  <!-- ═══════════ FINAL CTA ═══════════ -->
+  <section class="section container" style="padding-bottom:20px;">
+    <div class="cta-band reveal">
+      <h2>Run your first check in under a minute</h2>
+      <p>Local-first. Offline-capable. Your UPF files never leave your machine.</p>
+      <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-lg" data-launch type="button">Launch Workspace</button>
+        <a class="btn btn-ghost btn-lg" href="contact.html">Get in touch</a>
+      </div>
+    </div>
+  </section>
+
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script type="module" src="assets/js/three-hero.js"></script>
+</body>
+</html>

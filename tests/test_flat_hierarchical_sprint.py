@@ -174,13 +174,31 @@ def test_hierarchical_generation_round_trip_ownership():
                   SwitchParam("PSW_B", "PD_B", "vdd_aon", "vdd_b_sw",
                               "b_pwr_en")],
     )
+    def _single(text):
+        """Join Tcl line continuations (a trailing backslash continues onto the
+        next line) so assertions can match the logical command text."""
+        lines = text.splitlines()
+        out = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            while line.endswith("\\") and i + 1 < len(lines):
+                i += 1
+                line = line[:-1].strip() + " " + lines[i].strip()
+            out.append(line)
+            i += 1
+        return "\n".join(out)
+
     proj = generate_project(p)
     assert set(proj) == {"top.upf", "core_a.upf", "core_b.upf"}
-    assert "load_upf core_a.upf -scope core_a" in proj["top.upf"]
-    assert "load_upf core_b.upf -scope core_b" in proj["top.upf"]
-    assert "create_power_domain PD_A -elements {core_a}" in proj["core_a.upf"]
-    assert "create_power_domain PD_B -elements {core_b}" in proj["core_b.upf"]
-    assert "create_power_domain PD_AON" in proj["top.upf"]
+    top_flat = _single(proj["top.upf"])
+    assert "load_upf core_a.upf -scope core_a" in top_flat
+    assert "load_upf core_b.upf -scope core_b" in top_flat
+    ca_flat = _single(proj["core_a.upf"])
+    cb_flat = _single(proj["core_b.upf"])
+    assert "create_power_domain PD_A -elements {core_a}" in ca_flat
+    assert "create_power_domain PD_B -elements {core_b}" in cb_flat
+    assert "create_power_domain PD_AON" in top_flat
     # deterministic: identical project bytes across runs
     assert generate_project(p) == proj
     with tempfile.TemporaryDirectory() as td:
@@ -328,6 +346,7 @@ def test_hierarchical_load_upf_from_top_scope_no_false_undefined():
     top-level supplies - regression for false UPF-010 errors when set_scope
     preceded load_upf."""
     proj = _build_hier_project()
+    # load_upf is emitted from the top scope (no set_scope wrapper)
     assert "set_scope core_a" not in proj["top.upf"].split("load_upf")[0]
     with tempfile.TemporaryDirectory() as td:
         for name, text in proj.items():

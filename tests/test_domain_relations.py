@@ -25,6 +25,21 @@ from upf_insight.preprocess.upf_preprocess import preprocess
 EXAMPLES = "tests/examples"
 
 
+def _single(text: str) -> str:
+    """Join Tcl line continuations (trailing backslash) into logical lines."""
+    lines = text.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        while line.endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = line[:-1].strip() + " " + lines[i].strip()
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def _gen(params: UPFParams):
     return validate([_tmp_write(params)])
 
@@ -144,8 +159,9 @@ def test_generate_with_relations_is_deterministic():
     # make each selected semantics true: set_isolation / set_level_shifter
     # for the isolation,level_shift relation, and the switch is already
     # generated from the switch parameters.
-    assert "set_isolation iso_core_to_mem -domain core -isolation_supply vdd " in a
-    assert "set_level_shifter ls_core_to_mem -domain core -location parent " in a
+    flat = _single(a)
+    assert "set_isolation iso_core_to_mem -domain core -isolation_supply vdd" in flat
+    assert "set_level_shifter ls_core_to_mem -domain core -location parent" in flat
     # relations survive the round trip into the canonical model: the switch
     # makes aon -> core a real cross-domain interaction, the synthesized
     # level shifter makes core -> mem a real level-shift interaction, and
@@ -179,12 +195,13 @@ def test_hierarchical_project_files_and_determinism():
                   architecture="hierarchical", hierarchy=["core_a", "core_b"])
     proj = generate_project(p)
     assert set(proj.keys()) == {"top.upf", "core_a.upf", "core_b.upf"}
-    assert "load_upf core_a.upf -scope core_a" in proj["top.upf"]
-    assert "load_upf core_b.upf -scope core_b" in proj["top.upf"]
+    top_flat = _single(proj["top.upf"])
+    assert "load_upf core_a.upf -scope core_a" in top_flat
+    assert "load_upf core_b.upf -scope core_b" in top_flat
     # each child owns its own domain in its own scope - no shared first-domain
     # fallback, no duplicate definitions across files
-    assert "create_power_domain core_a -elements {core_a}" in proj["core_a.upf"]
-    assert "create_power_domain core_b -elements {core_b}" in proj["core_b.upf"]
+    assert "create_power_domain core_a -elements {core_a}" in _single(proj["core_a.upf"])
+    assert "create_power_domain core_b -elements {core_b}" in _single(proj["core_b.upf"])
     assert "set_scope core_a" in proj["core_a.upf"]
     assert "set_scope core_b" in proj["core_b.upf"]
     # deterministic

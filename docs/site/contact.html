@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact — UPF-Insight</title>
+  <meta name="description" content="Request a Professional trial, Enterprise pricing, or ask about custom rule packs for your UPF flow.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <section class="page-hero container">
+    <span class="eyebrow reveal">Contact</span>
+    <h1 class="reveal" style="--reveal-delay:80ms">Let's talk<br><span class="grad-text">power intent.</span></h1>
+    <p class="reveal" style="--reveal-delay:160ms">
+      Trials, enterprise licensing, custom rule packs or a question about a finding —
+      we answer within two business days.
+    </p>
+  </section>
+
+  <section class="section container" style="padding-top:30px;">
+    <div style="display:grid; grid-template-columns:minmax(280px,1fr) minmax(340px,1.4fr); gap:48px;">
+      <div class="reveal">
+        <div class="card spotlight" style="margin-bottom:20px;">
+          <h3 style="margin-bottom:12px;">What happens next</h3>
+          <ul style="list-style:none; color:var(--text-2); font-size:14.5px; display:grid; gap:11px;">
+            <li>① We read your message (a human, not an autoresponder).</li>
+            <li>② For trials: a license key within one business day.</li>
+            <li>③ For enterprise: a 30-minute scoping call.</li>
+          </ul>
+        </div>
+        <div class="card spotlight">
+          <h3 style="margin-bottom:12px;">Try it meanwhile</h3>
+          <p style="color:var(--text-2); font-size:14.5px; margin-bottom:18px;">
+            The Community edition needs no registration at all.
+          </p>
+          <button class="btn btn-primary" data-launch type="button">Launch Workspace</button>
+        </div>
+      </div>
+
+      <form class="card spotlight reveal" id="contact-form" style="--reveal-delay:120ms;" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-name">Name</label>
+            <input id="f-name" type="text" required autocomplete="name" placeholder="Ada Lovelace">
+          </div>
+          <div class="field">
+            <label for="f-email">Work email</label>
+            <input id="f-email" type="email" required autocomplete="email" placeholder="ada@company.com">
+          </div>
+          <div class="field">
+            <label for="f-company">Company</label>
+            <input id="f-company" type="text" autocomplete="organization" placeholder="Company / institute">
+          </div>
+          <div class="field">
+            <label for="f-topic">Topic</label>
+            <select id="f-topic" required>
+              <option value="">Select…</option>
+              <option>Professional trial</option>
+              <option>Enterprise licensing</option>
+              <option>Custom rule pack</option>
+              <option>Technical question</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="f-msg">Message</label>
+            <textarea id="f-msg" required placeholder="Tell us about your designs, UPF versions and what you want to validate…"></textarea>
+          </div>
+          <div class="full" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <button class="btn btn-primary" type="submit">Send message</button>
+            <span class="mono" id="form-status" style="font-size:12.5px; color:var(--text-3);"></span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script>
+    (() => {
+      const form = document.getElementById("contact-form");
+      const status = document.getElementById("form-status");
+      form.addEventListener("submit", e => {
+        e.preventDefault();
+        if (!form.reportValidity()) return;
+        // Static site: no backend. Persist locally + confirm honestly.
+        const payload = Object.fromEntries(new FormData(form).entries());
+        try {
+          localStorage.setItem("upf-insight-contact", JSON.stringify(payload));
+        } catch { /* private mode */ }
+        form.reset();
+        status.textContent = "✓ saved locally — this demo page has no mail backend";
+        status.style.color = "var(--accent-3)";
+      });
+    })();
+  </script>
+</body>
+</html>

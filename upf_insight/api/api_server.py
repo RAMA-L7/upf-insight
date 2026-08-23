@@ -132,6 +132,14 @@ class Handler(BaseHTTPRequestHandler):
             from ..engine.rules.rules_registry import registered_rules
 
             self._send_json({"rules": [r.__dict__ for r in registered_rules()]})
+        elif parsed.path == "/api/quality":
+            from ..engine.quality import run_quality_report
+
+            self._send_json(run_quality_report().to_dict())
+        elif parsed.path == "/api/rules/audit":
+            from ..engine.rules.audit import audit_registry
+
+            self._send_json(audit_registry())
         elif parsed.path == "/api/sample":
             qs = parse_qs(parsed.query)
             name = (qs.get("name") or [""])[0]

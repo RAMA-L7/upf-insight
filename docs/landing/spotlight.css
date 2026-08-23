@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Spotlight Glow — Clerk-style mouse-following card effect
+ *
+ * Usage:
+ *   1. Add class "spotlight-card" to any card element
+ *   2. Include this CSS file
+ *   3. Include the JS from spotlight.js
+ *
+ * No React. No Tailwind. No dependencies. Pure CSS + vanilla JS.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Base card ── */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0c0c12;
+}
+
+/* ── Dot grid glow layer ── */
+.spotlight-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+
+  /* Dot grid: 1.5px blue dots spaced 12px apart */
+  background-image: radial-gradient(
+    circle,
+    var(--spotlight-color, rgba(91, 155, 245, 0.7)) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 12px 12px;
+
+  /* Mask: only reveal dots within 280px of cursor */
+  mask-image: radial-gradient(
+    circle var(--spotlight-radius, 280px) at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    black 0%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    circle var(--spotlight-radius, 280px) at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    black 0%,
+    transparent 100%
+  );
+}
+
+/* ── Border glow layer ── */
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  transition: opacity 300ms ease;
+
+  /* Soft radial glow for border highlight */
+  background: radial-gradient(
+    circle calc(var(--spotlight-radius, 280px) * 0.6) at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    var(--spotlight-border-color, rgba(91, 155, 245, 0.15)),
+    transparent 70%
+  );
+
+  /* Mask to only show on the border (1px ring) */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1px;
+}
+
+/* ── Hover state ── */
+.spotlight-card:hover::after,
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+/* ── Content sits above glow ── */
+.spotlight-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ═══════ Color variants ═══════ */
+
+/* Blue (default — validation, capabilities) */
+.spotlight-blue {
+  --spotlight-color: rgba(91, 155, 245, 0.7);
+  --spotlight-border-color: rgba(91, 155, 245, 0.15);
+}
+
+/* Green (adversarial, success) */
+.spotlight-green {
+  --spotlight-color: rgba(52, 211, 153, 0.7);
+  --spotlight-border-color: rgba(52, 211, 153, 0.15);
+}
+
+/* Amber (warning, PST) */
+.spotlight-amber {
+  --spotlight-color: rgba(245, 158, 11, 0.7);
+  --spotlight-border-color: rgba(245, 158, 11, 0.15);
+}
+
+/* Red (error, findings) */
+.spotlight-red {
+  --spotlight-color: rgba(239, 68, 68, 0.7);
+  --spotlight-border-color: rgba(239, 68, 68, 0.15);
+}
+
+/* Soft glow (no dots — just a smooth radial gradient) */
+.spotlight-soft::after {
+  background-image: none;
+  background: radial-gradient(
+    circle 120px at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    var(--spotlight-color, rgba(91, 155, 245, 0.15)),
+    transparent
+  );
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* ═══════ Size variants ═══════ */
+
+/* Smaller mask for compact cards */
+.spotlight-sm {
+  --spotlight-radius: 180px;
+}
+
+/* Larger mask for hero cards */
+.spotlight-lg {
+  --spotlight-radius: 360px;
+}
+
+/* ═══════ Reduced motion ═══════ */
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-card::after,
+  .spotlight-card::before {
+    display: none;
+  }
+}

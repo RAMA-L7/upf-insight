@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spotlight Glow Demo</title>
+  <link rel="stylesheet" href="spotlight.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #08080c; color: #ccc; padding: 48px 32px; }
+    h1 { font-size: 24px; font-weight: 700; color: #eee; margin-bottom: 8px; }
+    .sub { font-size: 13px; color: #555; margin-bottom: 32px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 900px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .card-body { padding: 24px; }
+    .card-tag { font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; font-family: monospace; }
+    .card-title { font-size: 14px; font-weight: 600; color: #ddd; margin-bottom: 6px; }
+    .card-desc { font-size: 11px; color: #555; line-height: 1.6; }
+    .tag-blue { color: #5b9bf5; }
+    .tag-green { color: #34d399; }
+    .tag-amber { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>Spotlight Glow — Dot Grid Effect</h1>
+  <p class="sub">Hover over any card. Dots illuminate near your cursor.</p>
+
+  <div class="grid">
+    <div class="spotlight-card spotlight-blue">
+      <div class="card-body">
+        <div class="card-tag tag-blue">Validation</div>
+        <div class="card-title">74 Semantic Rules</div>
+        <div class="card-desc">Deterministic UPF validation across 6 layers and 11 categories. Every finding traces to a source line.</div>
+      </div>
+    </div>
+
+    <div class="spotlight-card spotlight-green">
+      <div class="card-body">
+        <div class="card-tag tag-green">Adversarial</div>
+        <div class="card-title">42/42 Mutations Detected</div>
+        <div class="card-desc">Adversarial corpus with intentional defects across supply, switch, isolation, retention, and PST categories.</div>
+      </div>
+    </div>
+
+    <div class="spotlight-card spotlight-amber">
+      <div class="card-body">
+        <div class="card-tag tag-amber">Architecture</div>
+        <div class="card-title">Zero LLM Calls</div>
+        <div class="card-desc">No probabilistic output. No cloud dependency. Pure deterministic analysis — same input, same output, always.</div>
+      </div>
+    </div>
+  </div>
+
+  <h1 style="margin-top:48px">Soft Glow (No Dots)</h1>
+  <p class="sub">Same cards with spotlight-soft class — smooth radial gradient instead of dot grid.</p>
+
+  <div class="grid">
+    <div class="spotlight-card spotlight-soft spotlight-blue">
+      <div class="card-body">
+        <div class="card-tag tag-blue">Supply</div>
+        <div class="card-title">Supply Topology</div>
+        <div class="card-desc">Nets, ports, sets, connectivity, hierarchy. Ground-reference validation.</div>
+      </div>
+    </div>
+
+    <div class="spotlight-card spotlight-soft spotlight-green">
+      <div class="card-body">
+        <div class="card-tag tag-green">Finding</div>
+        <div class="card-title">Dependency Cascade</div>
+        <div class="card-desc">Root causes block dependent findings. No noise from secondary errors.</div>
+      </div>
+    </div>
+
+    <div class="spotlight-card spotlight-soft spotlight-amber">
+      <div class="card-body">
+        <div class="card-tag tag-amber">PST</div>
+        <div class="card-title">Power State Table</div>
+        <div class="card-desc">Consistency, impossible states, declared-vs-used, transition validation.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="spotlight.js"></script>
+</body>
+</html>

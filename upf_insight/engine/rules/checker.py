@@ -62,6 +62,13 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
     """Run the deterministic rule set against a power-intent model.
 
     ``rules`` optionally restricts execution to a subset of rule codes.
+
+    After execution, a cascade pass suppresses dependent findings: when a
+    prerequisite rule (declared via ``Rule.depends_on``) produced an error on
+    the same subject (e.g. UPF-010 undefined supply -> UPF-073 switch output
+    unused), the dependent finding is downgraded to ``info`` and tagged with
+    ``blocked_by`` so it reads as context, not as a definitive secondary
+    error.
     """
     result = CheckResult(model=model)
     for rule in rules_registry.registered_rules():
@@ -85,8 +92,56 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
             f.rule = f.rule or rule.code
             f.severity = f.severity or rule.severity
             result.findings.append(f)
+    _apply_cascade_suppression(result)
+    _enforce_evidence_boundary(result)
     _resolve_finding_files(model, result.findings)
     return result
+
+
+def _apply_cascade_suppression(result: CheckResult) -> None:
+    """Downgrade dependent findings whose prerequisite already errored.
+
+    The registry declares dependencies via ``Rule.depends_on``.  A dependent
+    finding on subject S is only suppressed when the prerequisite produced an
+    *error* finding on the *same* subject S - so a clean run or a different
+    subject is never touched.
+    """
+    by_code = {r.code: r for r in rules_registry.registered_rules()}
+    blocking_errors: Dict[str, set] = {}
+    for f in result.findings:
+        if f.severity == "error" and f.subject:
+            blocking_errors.setdefault(f.subject, set()).add(f.rule)
+    for f in result.findings:
+        rule = by_code.get(f.rule)
+        if rule is None or not rule.depends_on:
+            continue
+        if not f.subject:
+            continue
+        fired = blocking_errors.get(f.subject, set())
+        blockers = [b for b in rule.depends_on if b in fired]
+        if not blockers:
+            continue
+        f.severity = "info"
+        f.support = "BLOCKED"
+        f.blocked_by = ",".join(blockers)
+        f.message = (f"[blocked by {f.blocked_by}] " + f.message)
+
+
+def _enforce_evidence_boundary(result: CheckResult) -> None:
+    """Never let netlist-required evidence become a definitive error.
+
+    A fact that can only be established with a netlist (e.g. whether a signal
+    actually crosses between two domains) must never be reported as an error:
+    UNKNOWN is not FALSE, and a missing netlist is not a proven defect. Any
+    error finding carrying ``NETLIST_REQUIRED`` support is downgraded to a
+    warning so the trust boundary holds even if a future rule mis-tags its
+    finding. Findings grounded in declared UPF facts (``VALIDATED``,
+    ``PARTIAL``, ``UNSUPPORTED``) keep their severity.
+    """
+    for f in result.findings:
+        if f.severity == "error" and f.support == "NETLIST_REQUIRED":
+            f.severity = "warning"
+            f.message = ("[netlist required] " + f.message)
 
 
 def _resolve_finding_files(model: PowerIntentModel, findings) -> None:

@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 580" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#1a1a1a"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#27ae60"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 6" refX="9" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#2980b9"/>
+    </marker>
+    <style>
+      .title { font-size: 17px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 11px; fill: #666; }
+      .section-title { font-size: 13px; font-weight: 700; fill: #1a1a1a; }
+      .domain-aon { fill: #f5f5f0; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .domain-core { fill: #f8f8f8; stroke: #1a1a1a; stroke-width: 1.5; rx: 6; }
+      .ret-box { fill: #ede7f6; stroke: #7e57c2; stroke-width: 1.5; rx: 4; }
+      .reg-box { fill: #fff; stroke: #1a1a1a; stroke-width: 1.5; rx: 4; }
+      .reg-retained { fill: #ede7f6; stroke: #7e57c2; stroke-width: 1.5; rx: 4; }
+      .supply-rail { fill: #e8e8e8; stroke: #1a1a1a; stroke-width: 1.2; rx: 3; }
+      .phase-box { fill: #fafafa; stroke: #1a1a1a; stroke-width: 1; rx: 4; }
+      .label { font-size: 12px; font-weight: 600; fill: #1a1a1a; text-anchor: middle; }
+      .label-lg { font-size: 14px; font-weight: 700; fill: #1a1a1a; text-anchor: middle; }
+      .label-sm { font-size: 10px; fill: #555; text-anchor: middle; }
+      .label-mono { font-size: 10px; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .label-volt { font-size: 11px; font-weight: 600; fill: #888; text-anchor: middle; font-family: ui-monospace, monospace; }
+      .connector { fill: none; stroke: #1a1a1a; stroke-width: 1.5; marker-end: url(#arr); }
+      .connector-green { fill: none; stroke: #27ae60; stroke-width: 1.5; marker-end: url(#arr-green); }
+      .connector-blue { fill: none; stroke: #2980b9; stroke-width: 1.5; marker-end: url(#arr-blue); }
+      .signal-line { fill: none; stroke: #7e57c2; stroke-width: 1.5; stroke-dasharray: 5,3; marker-end: url(#arr); }
+      .annotation { font-size: 9px; fill: #999; font-family: ui-monospace, monospace; }
+      .ctrl-label { font-size: 9px; fill: #7e57c2; text-anchor: middle; font-style: italic; }
+      .divider { stroke: #ddd; stroke-width: 0.8; stroke-dasharray: 4,3; }
+      .phase-label { font-size: 11px; font-weight: 600; fill: #1a1a1a; }
+      .status-on { fill: #e8f5e9; stroke: #27ae60; stroke-width: 1; rx: 10; }
+      .status-off { fill: #ffebee; stroke: #c0392b; stroke-width: 1; rx: 10; }
+      .status-text { font-size: 10px; font-weight: 600; text-anchor: middle; font-family: ui-monospace, monospace; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="410" y="28" class="title" text-anchor="middle">Retention Strategy</text>
+  <text x="410" y="46" class="subtitle" text-anchor="middle">State preservation across power-down: save → retain → restore</text>
+
+  <!-- ═══════ LEFT: Architecture ═══════ -->
+  <text x="200" y="78" class="section-title" text-anchor="middle">Architecture</text>
+
+  <!-- AON domain -->
+  <rect x="30" y="88" width="340" height="360" class="domain-aon"/>
+  <text x="200" y="108" class="label-lg">AON Domain (Always-On)</text>
+  <rect x="148" y="114" width="104" height="20" rx="10" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="200" y="128" class="label-volt">1.0V · always powered</text>
+
+  <!-- Retention Supply -->
+  <rect x="60" y="140" width="280" height="24" class="supply-rail"/>
+  <text x="200" y="157" class="label-sm">VDD_RET (retention supply)</text>
+
+  <!-- Retention Register (inside AON) -->
+  <rect x="80" y="180" width="240" height="100" class="ret-box"/>
+  <text x="200" y="200" class="label" fill="#7e57c2">Retention Register</text>
+  <text x="200" y="216" class="label-sm" fill="#7e57c2">retained elements (flip-flops)</text>
+
+  <!-- Retention internals -->
+  <rect x="100" y="228" width="200" height="18" rx="3" fill="#fff" stroke="#7e57c2" stroke-width="0.8"/>
+  <text x="200" y="241" class="annotation" fill="#7e57c2">state_bits[31:0]</text>
+  <rect x="100" y="252" width="200" height="18" rx="3" fill="#fff" stroke="#7e57c2" stroke-width="0.8"/>
+  <text x="200" y="265" class="annotation" fill="#7e57c2">control_regs[7:0]</text>
+
+  <!-- Save signal -->
+  <line x1="310" y1="200" x2="370" y2="200" class="signal-line"/>
+  <text x="395" y="195" class="ctrl-label">save signal</text>
+  <text x="395" y="207" class="annotation">save_retention_state</text>
+
+  <!-- Restore signal -->
+  <line x1="310" y1="260" x2="370" y2="260" class="signal-line"/>
+  <text x="395" y="255" class="ctrl-label">restore signal</text>
+  <text x="395" y="267" class="annotation">restore_retention_state</text>
+
+  <!-- Retention control -->
+  <text x="200" y="310" class="label-sm" fill="#7e57c2">set_retention_control</text>
+  <text x="200" y="324" class="annotation" text-anchor="middle">-retention_signal save_ret</text>
+  <text x="200" y="336" class="annotation" text-anchor="middle">-save_signal save_rst</text>
+  <text x="200" y="348" class="annotation" text-anchor="middle">-restore_signal restore_rst</text>
+
+  <!-- Retention supply connection -->
+  <line x1="200" y1="164" x2="200" y2="178" class="connector-blue"/>
+  <text x="200" y="375" class="label-sm" fill="#2980b9">retention supply powers state</text>
+  <text x="200" y="389" class="label-sm" fill="#2980b9">even when CORE is OFF</text>
+
+  <!-- CORE domain connection -->
+  <line x1="200" y1="400" x2="200" y2="430" class="connector"/>
+  <rect x="80" y="430" width="240" height="24" rx="3" fill="#f0f0f0" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="200" y="447" class="label-sm">CORE domain (retained elements)</text>
+
+  <!-- ═══════ RIGHT: Power-down flow ═══════ -->
+  <text x="620" y="78" class="section-title" text-anchor="middle">Power-Down Flow</text>
+
+  <!-- Phase 1: ALL ON -->
+  <rect x="440" y="90" width="360" height="70" class="phase-box"/>
+  <text x="460" y="108" class="phase-label" text-anchor="start">1. ALL ON</text>
+  <rect x="460" y="116" width="60" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="129" class="status-text" fill="#27ae60">VDD ON</text>
+  <rect x="530" y="116" width="80" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="570" y="129" class="status-text" fill="#27ae60">CORE ON</text>
+  <rect x="620" y="116" width="90" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="665" y="129" class="status-text" fill="#27ae60">RETENTION ON</text>
+  <text x="460" y="150" class="annotation" text-anchor="start">state actively used by CORE logic</text>
+
+  <!-- Arrow -->
+  <line x1="620" y1="162" x2="620" y2="178" class="connector"/>
+
+  <!-- Phase 2: SAVE -->
+  <rect x="440" y="178" width="360" height="70" class="phase-box" stroke="#7e57c2" stroke-width="1"/>
+  <text x="460" y="196" class="phase-label" text-anchor="start" fill="#7e57c2">2. SAVE STATE</text>
+  <rect x="460" y="204" width="60" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="217" class="status-text" fill="#27ae60">VDD ON</text>
+  <rect x="530" y="204" width="80" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="570" y="217" class="status-text" fill="#27ae60">CORE ON</text>
+  <rect x="620" y="204" width="90" height="18" rx="9" fill="#ede7f6" stroke="#7e57c2" stroke-width="1"/>
+  <text x="665" y="217" class="status-text" fill="#7e57c2">SAVE →</text>
+  <text x="460" y="240" class="annotation" text-anchor="start">save signal captures state to retention regs</text>
+
+  <!-- Arrow -->
+  <line x1="620" y1="250" x2="620" y2="266" class="connector"/>
+
+  <!-- Phase 3: CORE OFF -->
+  <rect x="440" y="266" width="360" height="70" class="phase-box"/>
+  <text x="460" y="284" class="phase-label" text-anchor="start">3. CORE POWERED DOWN</text>
+  <rect x="460" y="292" width="60" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="305" class="status-text" fill="#27ae60">VDD ON</text>
+  <rect x="530" y="292" width="80" height="18" rx="9" fill="#ffebee" stroke="#c0392b" stroke-width="1"/>
+  <text x="570" y="305" class="status-text" fill="#c0392b">CORE OFF</text>
+  <rect x="620" y="292" width="90" height="18" rx="9" fill="#ede7f6" stroke="#7e57c2" stroke-width="1"/>
+  <text x="665" y="305" class="status-text" fill="#7e57c2">RETAINED</text>
+  <text x="460" y="326" class="annotation" text-anchor="start">state preserved by retention supply (VDD_RET)</text>
+
+  <!-- Arrow -->
+  <line x1="620" y1="338" x2="620" y2="354" class="connector"/>
+
+  <!-- Phase 4: RESTORE -->
+  <rect x="440" y="354" width="360" height="70" class="phase-box" stroke="#7e57c2" stroke-width="1"/>
+  <text x="460" y="372" class="phase-label" text-anchor="start" fill="#7e57c2">4. RESTORE STATE</text>
+  <rect x="460" y="380" width="60" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="393" class="status-text" fill="#27ae60">VDD ON</text>
+  <rect x="530" y="380" width="80" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="570" y="393" class="status-text" fill="#27ae60">CORE ON</text>
+  <rect x="620" y="380" width="90" height="18" rx="9" fill="#ede7f6" stroke="#7e57c2" stroke-width="1"/>
+  <text x="665" y="393" class="status-text" fill="#7e57c2">RESTORE ←</text>
+  <text x="460" y="414" class="annotation" text-anchor="start">restore signal loads state back to CORE regs</text>
+
+  <!-- Arrow -->
+  <line x1="620" y1="426" x2="620" y2="442" class="connector"/>
+
+  <!-- Phase 5: ALL ON again -->
+  <rect x="440" y="442" width="360" height="50" class="phase-box" stroke="#27ae60" stroke-width="1"/>
+  <text x="460" y="460" class="phase-label" text-anchor="start" fill="#27ae60">5. STATE RESTORED</text>
+  <rect x="460" y="468" width="60" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="490" y="481" class="status-text" fill="#27ae60">VDD ON</text>
+  <rect x="530" y="468" width="80" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="570" y="481" class="status-text" fill="#27ae60">CORE ON</text>
+  <rect x="620" y="468" width="90" height="18" rx="9" fill="#e8f5e9" stroke="#27ae60" stroke-width="1"/>
+  <text x="665" y="481" class="status-text" fill="#27ae60">STATE OK</text>
+
+  <!-- Key insight -->
+  <rect x="440" y="510" width="360" height="50" rx="4" fill="#ede7f6" stroke="#7e57c2" stroke-width="1"/>
+  <text x="620" y="530" class="label" fill="#7e57c2" font-size="11">Key: retention supply (VDD_RET) must</text>
+  <text x="620" y="546" class="label" fill="#7e57c2" font-size="11">remain ON even when CORE is OFF</text>
+</svg>

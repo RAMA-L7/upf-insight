@@ -32,6 +32,9 @@ class ValidateResult:
     readiness: Optional[ReadinessResult] = None
     coverage: Optional[CoverageResult] = None
     relations: Optional[object] = None  # DomainRelations (derived, canonical)
+    interactions: Optional[object] = None  # InteractionResult (derived)
+    wildcards: Optional[object] = None  # WildcardResult (derived)
+    design_coverage: Optional[object] = None  # DesignCoverageResult (netlist)
     file_count: int = 0
     command_count: int = 0
 
@@ -51,6 +54,10 @@ class ValidateResult:
             "readiness": self.readiness.to_dict() if self.readiness else None,
             "coverage": self.coverage.to_dict() if self.coverage else None,
             "relations": rel,
+            "interactions": self.interactions.to_dict() if self.interactions else None,
+            "wildcards": self.wildcards.to_dict() if self.wildcards else None,
+            "design_coverage": (self.design_coverage.to_dict()
+                                if self.design_coverage else None),
             "model": model,
             "file_count": self.file_count,
             "command_count": self.command_count,
@@ -65,9 +72,9 @@ def _run(records: List[CommandRecord], paths: List[str],
          netlist: Optional[str] = None) -> ValidateResult:
     model: PowerIntentModel = build_model(records)
     if netlist:
-        from .design.design_context import load_optional
+        from .design.netlist_parser import load_design
 
-        model.design = load_optional(netlist)
+        model.design = load_design(netlist)
     check: CheckResult = check_model(model, rules=rules)
     support: SupportReport = compute_support_boundary(model)
     pst: PstAnalysis = analyze_pst(model)
@@ -76,6 +83,13 @@ def _run(records: List[CommandRecord], paths: List[str],
     from ..model.relations import derive_domain_relations
 
     relations = derive_domain_relations(model)
+    from .analysis.strategy_interactions import analyze_strategy_interactions
+    from .analysis.wildcard_analyzer import analyze_wildcards
+    from .design.design_coverage import analyze_design_coverage
+
+    interactions = analyze_strategy_interactions(model)
+    wildcards = analyze_wildcards(model)
+    design_cov = analyze_design_coverage(model, model.design)
     return ValidateResult(
         check=check,
         support=support,
@@ -83,6 +97,9 @@ def _run(records: List[CommandRecord], paths: List[str],
         readiness=readiness,
         coverage=coverage,
         relations=relations,
+        interactions=interactions,
+        wildcards=wildcards,
+        design_coverage=design_cov,
         file_count=len(paths),
         command_count=model.commands_seen,
     )
@@ -117,10 +134,15 @@ def validate_records(records: List[CommandRecord],
                 design = DesignContext.from_dict(design)
             result.check.model.design = design
             result.check = check_model(result.check.model, rules=rules)
-            # Design context changes the support boundary and the DESIGN_CONTEXT
-            # readiness dimension - recompute both so the web UI is honest.
+            # Design context changes the support boundary, the DESIGN_CONTEXT
+            # readiness dimension and the netlist-aware coverage - recompute
+            # all three so the web UI is honest.
+            from .design.design_coverage import analyze_design_coverage
+
             result.support = compute_support_boundary(result.check.model)
             result.readiness = compute_readiness(result.check.model, result.check)
+            result.design_coverage = analyze_design_coverage(
+                result.check.model, design)
     return result
 
 

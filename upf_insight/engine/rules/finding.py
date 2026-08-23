@@ -20,6 +20,13 @@ class Finding:
     file: str = ""
     line: Optional[int] = None
     support: str = "VALIDATED"
+    #: The object this finding is about (domain/supply/switch/strategy name).
+    #: Used by cascade suppression: when a prerequisite rule (e.g. UPF-010
+    #: undefined supply) errors on the same subject, dependent findings on
+    #: that subject are downgraded instead of emitted as definitive errors.
+    subject: str = ""
+    #: Set by the cascade pass: the rule code that blocked this finding.
+    blocked_by: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -29,6 +36,8 @@ class Finding:
             "file": self.file,
             "line": self.line,
             "support": self.support,
+            "subject": self.subject,
+            "blocked_by": self.blocked_by,
         }
 
 

@@ -1,0 +1,85 @@
+name: "UPF-Insight CI Quality Gate"
+description: >
+  Deterministic UPF power-intent gate: validates a UPF file against an
+  optional baseline under a gate policy and fails the job when the policy is
+  violated. Mirrors the rta-gate action contract.
+inputs:
+  upf:
+    description: "UPF file(s) to validate (space-separated for multiple)"
+    required: true
+  netlist:
+    description: "Optional design context (.json snapshot or Verilog netlist)"
+    required: false
+    default: ""
+  baseline:
+    description: "Baseline snapshot JSON produced by --save-baseline"
+    required: false
+    default: ""
+  gate:
+    description: "Gate policy: BLOCKERS_ONLY | NO_READINESS_REGRESSION | STRICT | policy JSON path"
+    required: false
+    default: "BLOCKERS_ONLY"
+  install-source:
+    description: "pypi | local"
+    required: false
+    default: "local"
+  upf-version-spec:
+    description: "Version spec used when install-source=pypi"
+    required: false
+    default: "upf-insight"
+  python-version:
+    description: "Python version for the job"
+    required: false
+    default: "3.12"
+outputs:
+  exit-code:
+    description: "upf-insight check exit code"
+    value: ${{ steps.gate.outputs.exit_code }}
+  gate-result:
+    description: "PASS or FAIL"
+    value: ${{ steps.gate.outputs.gate_result }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install upf-insight
+      shell: bash
+      run: |
+        if [ "${{ inputs.install-source }}" = "pypi" ]; then
+          pip install "${{ inputs.upf-version-spec }}"
+        else
+          pip install -e "${{ github.workspace }}"
+        fi
+    - name: Run gate
+      id: gate
+      shell: bash
+      env:
+        UPF_FILES: ${{ inputs.upf }}
+        NETLIST_FILE: ${{ inputs.netlist }}
+        BASELINE_FILE: ${{ inputs.baseline }}
+        GATE_POLICY: ${{ inputs.gate }}
+      run: |
+        set +e
+        ARGS=""
+        if [ -n "$NETLIST_FILE" ]; then ARGS="$ARGS --netlist $NETLIST_FILE"; fi
+        if [ -n "$BASELINE_FILE" ]; then ARGS="$ARGS --baseline $BASELINE_FILE"; fi
+        upf-insight check $UPF_FILES $ARGS --gate "$GATE_POLICY"
+        code=$?
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" -eq 0 ]; then result=PASS; else result=FAIL; fi
+        echo "gate_result=$result" >> "$GITHUB_OUTPUT"
+        echo "upf-gate result: $result (exit $code)"
+        exit $code
+    - name: Upload findings artifact
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p gate-artifacts
+        upf-insight check ${{ inputs.upf }} --format junit > gate-artifacts/findings.xml || true
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: upf-gate-findings
+        path: gate-artifacts/

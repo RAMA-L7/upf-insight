@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: upf-check
+        name: upf-insight check (staged .upf/.tcl)
+        entry: .pre-commit-hooks/upf-check.sh
+        language: system
+        files: \.(upf|tcl)$
+        pass_filenames: true
+        require_serial: true
+      - id: compileall
+        name: byte-compile python sources
+        entry: python -m compileall -q upf_insight scripts
+        language: system
+        pass_filenames: false

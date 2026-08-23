@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spotlight Debug</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #111; color: #ccc; padding: 20px; }
+    h1 { font-size: 16px; color: #fff; margin-bottom: 12px; }
+
+    /* Debug panel */
+    #dbg {
+      position: fixed; top: 10px; right: 10px; z-index: 999;
+      background: #222; border: 1px solid #444; border-radius: 4px;
+      padding: 10px; font-size: 11px; min-width: 200px;
+    }
+    #dbg .row { display: flex; justify-content: space-between; margin: 2px 0; }
+    #dbg .lbl { color: #888; }
+    #dbg .val { color: #5bf; font-weight: bold; }
+
+    /* Card */
+    .card {
+      position: relative;
+      width: 280px; height: 180px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      overflow: hidden;
+      margin: 16px 0;
+      display: inline-block;
+    }
+    .card-content {
+      position: relative; z-index: 1;
+      padding: 20px;
+    }
+    .card-content h2 { font-size: 14px; color: #fff; margin-bottom: 4px; }
+    .card-content p { font-size: 11px; color: #666; }
+
+    /* Glow layer */
+    .glow {
+      position: absolute; inset: 0; z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background-image: radial-gradient(circle, rgba(91,155,245,0.8) 2px, transparent 2px);
+      background-size: 14px 14px;
+      -webkit-mask-image: radial-gradient(circle 200px at var(--mx, 50%) var(--my, 50%), black 0%, transparent 100%);
+      mask-image: radial-gradient(circle 200px at var(--mx, 50%) var(--my, 50%), black 0%, transparent 100%);
+    }
+    .card:hover .glow { opacity: 1; }
+
+    /* Pulse layer */
+    .pulse {
+      position: absolute; inset: 0; z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: radial-gradient(circle 100px at var(--mx, 50%) var(--my, 50%), rgba(91,155,245,0.15), transparent 70%);
+      animation: pulseAnim 2s ease-in-out infinite;
+    }
+    .card:hover .pulse { opacity: 1; }
+    @keyframes pulseAnim {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    /* Test buttons */
+    .tests { margin: 20px 0; }
+    .btn {
+      background: #333; color: #fff; border: 1px solid #555;
+      padding: 6px 12px; margin: 4px; border-radius: 4px;
+      cursor: pointer; font-family: monospace; font-size: 11px;
+    }
+    .btn:hover { background: #444; }
+  </style>
+</head>
+<body>
+
+  <div id="dbg">
+    <div class="row"><span class="lbl">JS loaded:</span><span class="val" id="d-js">—</span></div>
+    <div class="row"><span class="lbl">Cards found:</span><span class="val" id="d-cards">—</span></div>
+    <div class="row"><span class="lbl">Glow divs:</span><span class="val" id="d-glow">—</span></div>
+    <div class="row"><span class="lbl">Mouse X:</span><span class="val" id="d-x">—</span></div>
+    <div class="row"><span class="lbl">Mouse Y:</span><span class="val" id="d-y">—</span></div>
+    <div class="row"><span class="lbl">Hovering:</span><span class="val" id="d-hover">—</span></div>
+    <div class="row"><span class="lbl">--mx set:</span><span class="val" id="d-mx">—</span></div>
+    <div class="row"><span class="lbl">--my set:</span><span class="val" id="d-my">—</span></div>
+  </div>
+
+  <h1>Spotlight Glow Debug Test</h1>
+  <p style="font-size:11px;color:#666;margin-bottom:16px">Hover over the card. Check debug panel top-right.</p>
+
+  <div class="card" id="testCard">
+    <div class="glow" id="testGlow"></div>
+    <div class="pulse" id="testPulse"></div>
+    <div class="card-content">
+      <h2>Test Card</h2>
+      <p>Move cursor here. Dots should illuminate.</p>
+    </div>
+  </div>
+
+  <div class="tests">
+    <button class="btn" onclick="testForceGlow()">Force glow ON</button>
+    <button class="btn" onclick="testForceGlowOff()">Force glow OFF</button>
+    <button class="btn" onclick="testSetVars()">Set vars manually</button>
+    <button class="btn" onclick="testCheckStyle()">Check computed style</button>
+  </div>
+
+  <div id="output" style="margin-top:12px;font-size:11px;color:#888;white-space:pre-wrap"></div>
+
+  <script>
+    var card = document.getElementById('testCard');
+    var glow = document.getElementById('testGlow');
+    var pulse = document.getElementById('testPulse');
+    var output = document.getElementById('output');
+
+    // Update debug panel
+    document.getElementById('d-js').textContent = 'YES';
+    document.getElementById('d-cards').textContent = document.querySelectorAll('.card').length;
+    document.getElementById('d-glow').textContent = document.querySelectorAll('.glow').length;
+
+    // Mouse tracking
+    card.addEventListener('mousemove', function(e) {
+      var rect = card.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+
+      glow.style.setProperty('--mx', x + 'px');
+      glow.style.setProperty('--my', y + 'px');
+      pulse.style.setProperty('--mx', x + 'px');
+      pulse.style.setProperty('--my', y + 'px');
+
+      document.getElementById('d-x').textContent = Math.round(x);
+      document.getElementById('d-y').textContent = Math.round(y);
+      document.getElementById('d-mx').textContent = glow.style.getPropertyValue('--mx');
+      document.getElementById('d-my').textContent = glow.style.getPropertyValue('--my');
+    });
+
+    card.addEventListener('mouseenter', function() {
+      document.getElementById('d-hover').textContent = 'YES';
+      document.getElementById('d-hover').style.color = '#3f3';
+    });
+    card.addEventListener('mouseleave', function() {
+      document.getElementById('d-hover').textContent = 'NO';
+      document.getElementById('d-hover').style.color = '#f55';
+    });
+
+    // Test functions
+    function testForceGlow() {
+      glow.style.opacity = '1';
+      output.textContent = 'Forced glow opacity to 1. You should see dots.';
+    }
+    function testForceGlowOff() {
+      glow.style.opacity = '0';
+      output.textContent = 'Forced glow opacity to 0.';
+    }
+    function testSetVars() {
+      glow.style.setProperty('--mx', '100px');
+      glow.style.setProperty('--my', '80px');
+      glow.style.opacity = '1';
+      output.textContent = 'Set --mx=100px, --my=80px, opacity=1. Dots should appear at (100,80).';
+    }
+    function testCheckStyle() {
+      var cs = window.getComputedStyle(glow);
+      output.textContent =
+        'opacity: ' + cs.opacity + '\\n' +
+        'mask-image: ' + cs.maskImage + '\\n' +
+        '-webkit-mask-image: ' + cs.webkitMaskImage + '\\n' +
+        'background-image: ' + (cs.backgroundImage ? cs.backgroundImage.substring(0, 80) + '...' : 'none') + '\\n' +
+        '--mx: ' + glow.style.getPropertyValue('--mx') + '\\n' +
+        '--my: ' + glow.style.getPropertyValue('--my');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+[
+ {
+  "code": "UPF-001",
+  "severity": "error",
+  "category": "SYNTAX",
+  "title": "Unknown UPF command"
+ },
+ {
+  "code": "UPF-002",
+  "severity": "error",
+  "category": "SYNTAX",
+  "title": "Illegal option"
+ },
+ {
+  "code": "UPF-003",
+  "severity": "error",
+  "category": "SYNTAX",
+  "title": "Missing required argument"
+ },
+ {
+  "code": "UPF-004",
+  "severity": "warning",
+  "category": "SYNTAX",
+  "title": "Unsupported upf_version"
+ },
+ {
+  "code": "UPF-005",
+  "severity": "warning",
+  "category": "SYNTAX",
+  "title": "Deprecated/legacy syntax"
+ },
+ {
+  "code": "UPF-006",
+  "severity": "error",
+  "category": "SYNTAX",
+  "title": "Malformed Tcl"
+ },
+ {
+  "code": "UPF-010",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Undefined supply reference"
+ },
+ {
+  "code": "UPF-011",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Undefined power domain"
+ },
+ {
+  "code": "UPF-012",
+  "severity": "warning",
+  "category": "REFERENCE",
+  "title": "Undefined instance / bad path"
+ },
+ {
+  "code": "UPF-013",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Duplicate definition"
+ },
+ {
+  "code": "UPF-014",
+  "severity": "warning",
+  "category": "REFERENCE",
+  "title": "Use-before-definition"
+ },
+ {
+  "code": "UPF-015",
+  "severity": "warning",
+  "category": "REFERENCE",
+  "title": "Circular dependency"
+ },
+ {
+  "code": "UPF-016",
+  "severity": "warning",
+  "category": "REFERENCE",
+  "title": "Invalid set_scope target"
+ },
+ {
+  "code": "UPF-020",
+  "severity": "error",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Domain missing primary supply"
+ },
+ {
+  "code": "UPF-021",
+  "severity": "error",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Domain element overlap"
+ },
+ {
+  "code": "UPF-022",
+  "severity": "warning",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Unconnected supply"
+ },
+ {
+  "code": "UPF-023",
+  "severity": "error",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Supply set missing power/ground"
+ },
+ {
+  "code": "UPF-024",
+  "severity": "error",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Supply connectivity mismatch"
+ },
+ {
+  "code": "UPF-025",
+  "severity": "info",
+  "category": "SUPPLY_DOMAIN",
+  "title": "Unused supply state"
+ },
+ {
+  "code": "UPF-030",
+  "severity": "error",
+  "category": "PST",
+  "title": "Declared state never used in PST"
+ },
+ {
+  "code": "UPF-031",
+  "severity": "error",
+  "category": "PST",
+  "title": "PST references undeclared state"
+ },
+ {
+  "code": "UPF-032",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Missing PST"
+ },
+ {
+  "code": "UPF-033",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Empty/unreachable PST state"
+ },
+ {
+  "code": "UPF-034",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Duplicate/overlapping PST state"
+ },
+ {
+  "code": "UPF-035",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Undeclared transition"
+ },
+ {
+  "code": "UPF-036",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Isolation/LS not PST-conditioned"
+ },
+ {
+  "code": "UPF-037",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Un-isolated power-down crossing"
+ },
+ {
+  "code": "UPF-038",
+  "severity": "warning",
+  "category": "PST",
+  "title": "Switchable net not modeled by PST"
+ },
+ {
+  "code": "UPF-039",
+  "severity": "error",
+  "category": "PST",
+  "title": "Impossible PST state"
+ },
+ {
+  "code": "UPF-040",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Isolation on non-always-on supply"
+ },
+ {
+  "code": "UPF-041",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Isolation self-located in switchable domain"
+ },
+ {
+  "code": "UPF-042",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Missing isolation on crossing"
+ },
+ {
+  "code": "UPF-043",
+  "severity": "info",
+  "category": "STRATEGY",
+  "title": "Redundant isolation"
+ },
+ {
+  "code": "UPF-044",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "-applies_to missing inouts"
+ },
+ {
+  "code": "UPF-045",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Isolation without control (or reverse)"
+ },
+ {
+  "code": "UPF-046",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Invalid clamp value"
+ },
+ {
+  "code": "UPF-047",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Isolation control not always-on"
+ },
+ {
+  "code": "UPF-050",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Retention supply powers down"
+ },
+ {
+  "code": "UPF-051",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Retention control not always-on"
+ },
+ {
+  "code": "UPF-052",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Retention without coverage"
+ },
+ {
+  "code": "UPF-053",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Retention control tied constant"
+ },
+ {
+  "code": "UPF-054",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Retention without control"
+ },
+ {
+  "code": "UPF-060",
+  "severity": "info",
+  "category": "STRATEGY",
+  "title": "Unnecessary level shifter"
+ },
+ {
+  "code": "UPF-061",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Missing level shifter"
+ },
+ {
+  "code": "UPF-062",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Wrong level-shifter rule"
+ },
+ {
+  "code": "UPF-063",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Level shifter self-located in switchable domain"
+ },
+ {
+  "code": "UPF-064",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Level-shifter control not always-on"
+ },
+ {
+  "code": "UPF-070",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Switch references undefined supply"
+ },
+ {
+  "code": "UPF-071",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Switch control not always-on"
+ },
+ {
+  "code": "UPF-072",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Always-on signal into switchable domain"
+ },
+ {
+  "code": "UPF-073",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Switch output unused"
+ },
+ {
+  "code": "UPF-074",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Switch state condition without control"
+ },
+ {
+  "code": "UPF-075",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Switch cannot toggle"
+ },
+ {
+  "code": "UPF-076",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Switch without off-state"
+ },
+ {
+  "code": "UPF-077",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Switch without control port"
+ },
+ {
+  "code": "UPF-078",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Retention without supply on switchable domain"
+ },
+ {
+  "code": "UPF-079",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Level-shifter threshold out of range"
+ },
+ {
+  "code": "UPF-065",
+  "severity": "error",
+  "category": "SUPPLY",
+  "title": "Ground on switched supply"
+ },
+ {
+  "code": "UPF-080",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Unknown -elements instance"
+ },
+ {
+  "code": "UPF-081",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Unknown control signal"
+ },
+ {
+  "code": "UPF-082",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Uncovered crossing (endpoint-based)"
+ },
+ {
+  "code": "UPF-083",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Retention coverage gap"
+ },
+ {
+  "code": "UPF-084",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Library PG mismatch"
+ },
+ {
+  "code": "UPF-090",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Repeater supply not always-on"
+ },
+ {
+  "code": "UPF-091",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Repeater control not always-on"
+ },
+ {
+  "code": "UPF-092",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Repeater self-located in switchable domain"
+ },
+ {
+  "code": "UPF-093",
+  "severity": "warning",
+  "category": "STRATEGY",
+  "title": "Repeater without elements"
+ },
+ {
+  "code": "UPF-094",
+  "severity": "error",
+  "category": "STRATEGY",
+  "title": "Repeater without control"
+ },
+ {
+  "code": "UPF-095",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Promoted entity not defined"
+ },
+ {
+  "code": "UPF-096",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Demotion not verifiable"
+ },
+ {
+  "code": "UPF-097",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Hierarchical composition unverified"
+ },
+ {
+  "code": "UPF-098",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Equivalent supply undefined"
+ },
+ {
+  "code": "UPF-099",
+  "severity": "error",
+  "category": "REFERENCE",
+  "title": "Supply map reference undefined"
+ },
+ {
+  "code": "UPF-100",
+  "severity": "warning",
+  "category": "DESIGN",
+  "title": "Loaded UPF file missing"
+ }
+]

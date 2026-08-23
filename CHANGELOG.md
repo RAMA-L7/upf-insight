@@ -5,6 +5,181 @@ All notable changes to UPF-Insight are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-08-23
+
+### Added - sdc-tools parity sprint
+
+Bringing UPF-Insight to feature parity with the Ṛta / sdc-tools validator:
+
+- **Verilog netlist parser** - `load_design()` accepts `.v/.sv` in addition
+  to the JSON design snapshot (ports, instances, buses, sequential
+  heuristics; malformed input never crashes).
+- **Netlist-aware design coverage** - `analyze_design_coverage()` buckets
+  inputs/outputs as CONSTRAINED/UNCONSTRAINED/PARTIAL against UPF port
+  attributes ("coverage is NOT correctness").
+- **Strategy interaction analysis** - new rules **UPF-085** (duplicate
+  strategy) and **UPF-086** (overriding/conflicting strategy: overlapping
+  switch outputs, contradictory locations, redefined retention).
+- **Wildcard risk analysis** - new rule **UPF-087**: specificity + 0-10 risk
+  score for wildcard element/target patterns.
+- **New CLI commands** - `analyze` (one-shot E2E with combined HTML report),
+  `batch check|report` (directory-wide), `lint` (`--check`/`--fix`),
+  `convert` (UPF -> JSON/YAML), `rules show CODE` plus severity/search
+  filters.
+- **Custom rule sets** - declarative YAML rules via `--custom-rules`
+  (`examples/policies/custom_rules_example.yaml`).
+- **MCP server** - `upf-insight-mcp` entry point exposing 8 deterministic
+  tools over JSON-RPC stdio.
+- **CI hardening** - GitHub Actions workflow (3 OS x Python 3.10-3.12,
+  registry audit, quality corpus, golden runner, real gate job), reusable
+  `upf-gate` composite action, pre-commit hook for staged `.upf/.tcl`.
+- **Evidence-as-product** - `scripts/build_evidence.py` (machine-checked
+  RELEASE_EVIDENCE.json manifest), `scripts/run_golden.py` (18-fixture
+  golden regression with drift reporting),
+  `scripts/generate_support_matrix.py` (docs/support_matrix.md).
+
+## [0.2.4] - 2026-08-17
+
+### Added - Semantic hardening: cascade, metadata audit, evidence boundary, quality metrics
+
+Four hardening workstreams that turn the adversarial suite into a maintained
+quality contract:
+
+- **Cascade / dependency quality** - dependent rules (UPF-070, UPF-073,
+  strategy rules) declare `depends_on` error prerequisites in the registry;
+  when a prerequisite errors on the same subject (e.g. UPF-010 undefined
+  supply), the dependent finding is downgraded to info and tagged
+  `blocked_by` instead of emitting a misleading secondary error. Every
+  strategy finding now carries a `subject` for cascade matching.
+- **Rule metadata audit** - every registered rule carries `semantic_inputs`,
+  a design `context` (UPF_ONLY / NETLIST_REQUIRED / PARTIAL), and a
+  `test_ref`. New `upf-insight rules audit` command verifies registry <->
+  handler sync, metadata completeness, dependency integrity (no cycles,
+  error-only prerequisites), and deterministic sorted ordering. 74 rules, all
+  audited clean; `tests/test_rule_audit.py` locks the contract.
+- **Evidence boundary (UNKNOWN != FALSE)** - the checker now enforces that a
+  fact requiring a netlist is never reported as a definitive error: any
+  error finding with NETLIST_REQUIRED support is downgraded to a warning.
+  `tests/test_evidence_boundary.py` (10 tests) proves unknown crossings stay
+  "may cross ... confirm", missing isolation stays a NETLIST_REQUIRED
+  warning, declared voltage facts remain errors, and an empty file is
+  NOT_VALIDATED, never VALIDATED.
+- **Quality metrics + `upf-insight quality`** - the canonical mutation corpus
+  moved into `engine/quality.py` so the CLI, API, and regression suite share
+  one source of truth (no test-only copy). The command reports detection
+  rate (42/42 = 100%), precision over error findings (28/38), precision over
+  all findings, baseline errors/false positives (0/0), and a per-category
+  breakdown, in text or `--json`. Exit code is deterministic.
+
+## [0.2.3] - 2026-08-17
+
+### Added - Adversarial coverage expansion (12 categories, 42 mutations)
+
+Expanded mutation testing from 9 cases to a structured semantic matrix
+covering every power-intent category the engine models:
+
+- **Structured mutation matrix** - `tests/test_adversarial_coverage.py` (9
+  tests): 42 deliberate defects across 11 categories - supply topology (5),
+  power switch (8), level shifting (4), isolation (5), retention (5),
+  always-on (2), PST (4), duplicates (3), supply connectivity (2), domain
+  relations (2), unsupported syntax (2). Detection rate: **42/42**, with
+  zero false positives on the clean baseline.
+- **Parser fix - `set_port_attributes` multi-target** - the builder only
+  recorded the first name in `set_port_attributes clk, rst, save, ...`;
+  every target is now parsed, so switch/retention/isolation controls are
+  actually recognized as always-on (surfaced real UPF-071/047/051 findings
+  that were previously masked).
+- **UPF-051 false positive fixed** - retention save/restore controls stored
+  as `{name sense}` pairs are now compared by signal name, so a clean
+  baseline no longer warns on controls that ARE declared always-on.
+- **New rule UPF-065** - domain primary ground wired to a power-switch
+  output (ground reference must be an always-on low rail).
+- **New rule UPF-077** - power switch with no control port can never be
+  toggled.
+- **New rule UPF-078** - retention on a switchable domain with no retention
+  supply cannot preserve state through power-down.
+- **New rule UPF-079** - level-shifter threshold outside every known supply
+  voltage is an implausible trip point (review).
+- **UPF-060 is now voltage-aware** - when both sides of a crossing have
+  known equal voltages the shifter is flagged unnecessary (warning); with
+  unknown voltages it stays an info advisory. Removed the unconditional
+  baseline info finding.
+
+## [0.2.2] - 2026-08-17
+
+### Added - Adversarial semantic validation (mutation testing)
+
+Proves UPF-Insight catches intentionally broken power intent, not merely that
+it accepts generated designs:
+
+- **New rule UPF-039** - impossible PST state: a row declaring a switch
+  output ON while its input supply is OFF is physically impossible (power
+  appearing out of nowhere). Registered in the rule registry (now 68 rules).
+- **UPF-073 upgraded info -> error** - a switch output consumed by no power
+  domain is a real defect (the switchable domain is not powered by the
+  switch), not an advisory.
+- **UPF-053 is now sense-aware** - parses `{name sense}` retention control
+  pairs and flags save/restore driven by the same signal with the same sense
+  (error, cannot sequence) vs. opposite senses (the canonical IEEE 1801
+  pattern).
+- **`tests/test_adversarial_mutations.py`** - 12 tests: clean baseline must
+  have 0 errors, 9 deliberate mutations each caught by the expected rule
+  (break switched supply, disconnect switch output, wrong LS rule, remove
+  LS, isolation at self, no retention elements, save/restore same sense,
+  impossible PST, remove always-on), plus a SHA-256 determinism regression.
+  Mutation detection rate: 9/9.
+- Generator tests corrected to model the real topology (switchable domain
+  consumes the switch output) so the upgraded UPF-073 stays clean on
+  generated intent.
+
+## [0.2.1] - 2026-08-17
+
+### Fixed - Generator semantic hardening (external UPF audit)
+
+Addresses the semantic-topology findings from an independent IEEE 1801 audit:
+
+- **Switched-domain supply topology** - a switchable domain's primary supply
+  is now the switch output (`set_domain_supply_net core
+  -primary_power_net vdd_sw_out`), and the switch input is the upstream
+  supply - `vdd -> switch -> vdd_sw_out -> core` is now the generated model.
+- **Per-domain voltage** - new `DomainParam.voltage` (CLI `--domain-voltage`,
+  API/UI column). The ON value of each supply in the PST is grounded in the
+  owning domain's voltage (ground stays 0V), so level-shifter thresholds and
+  `low_to_high` / `high_to_low` rules are meaningful. The validator's
+  UPF-061 now fires on a real different-voltage crossing without a shifter.
+- **Isolation direction** - `set_isolation` now emits explicit
+  `-applies_to outputs` (strategy + relation-synthesized), so the boundary
+  direction is never a silent UPF default.
+- **Location correctness** - isolation and level shifters on a switchable
+  domain are placed at `parent` (the always-on side), not `self`, so they
+  keep their supply when the domain powers down (resolves UPF-063).
+- **Retention elements + polarity** - `set_retention` carries explicit
+  `-elements {regA regB}`, and `set_retention_control` emits save/restore
+  with active sense (`-save_signal {save high}` / `-restore_signal
+  {restore low}`) instead of bare names.
+- **Meaningful PST** - default rows are ALL_ON plus one `sw.<name>.off` per
+  switch (VDD ON, switch output OFF); the physically impossible PS_OFF
+  (VDD OFF while the switch output is ON) is gone. Only port states actually
+  referenced by the PST are declared, so UPF-030 never fires on generated
+  output.
+- **Level-shifter `-applies_to`** - `set_level_shifter` emits
+  `-applies_to both` (and `inputs`/`outputs` when authored) so the covered
+  boundary is explicit.
+
+### Added - CLI / API / UI
+
+- CLI `generate --domain-voltage NAME:VOLTS` and `--retention-spec
+  DOMAIN[:SUPPLY[:SAVE[:RESTORE[:ELEMENTS]]]]`.
+- Generator UI: Voltage column on domains, Applies-to on isolation and
+  level shifters, Save/restore sense + Elements on retention, PST default
+  ALL_ON.
+
+### Tests
+
+- 6 new regression tests covering applies-to, parent location, retention
+  elements/polarity, voltage-grounded PST with UPF-061 detection, meaningful
+  default PST (no UPF-030), and CLI voltage/retention-spec.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added - Flat + Hierarchical power-intent sprint
