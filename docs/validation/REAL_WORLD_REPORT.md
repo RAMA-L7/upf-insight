@@ -9,24 +9,39 @@
 
 ## Headline
 
-**On UPF it did not write, UPF-Insight currently produces a 56% false-positive
-rate.** 53 of 95 findings on the validation corpus are tool defects, not
-defects in the designs.
+> **Status: the P0 grammar work has landed.** Every false-positive class this
+> report identified (D1 grammar coverage, D4 multi-line brace groups, D5
+> supply-port pairs, brace-group expansion, `map_power_switch`) is fixed and
+> pinned by hard assertions in `tests/test_real_world_corpus.py` — the former
+> `xfail` markers are inverted, which was this report's acceptance criterion.
+>
+> **Shipped-corpus false-positive rate is now 0.0% (0 of 21 findings).** All 21
+> remaining findings bucket as `genuine/needs-review`. Reproduce with
+> `python scripts/validate_corpus.py --json tests/corpus/`.
+>
+> The figures below are the **pre-fix v0.3.0 measurement**, retained as the
+> before-picture. The external open-source figures (AnyCore, Tenstorrent) have
+> **not** been re-measured — that UPF is not redistributed here, so they cannot
+> be re-run and should not be read as current. Everything they attribute to the
+> grammar defects is the code fixed below, but treat 65%/100% as a historical
+> upper bound rather than a present claim.
 
-**On production open-source UPF the rate is worse: 65% across 37 files from
+**Measured at v0.3.0, on UPF the tool did not write, UPF-Insight produced a 56%
+false-positive rate.** 53 of 95 findings on the validation corpus were tool
+defects, not defects in the designs.
+
+**On production open-source UPF the rate was worse: 65% across 37 files from
 the AnyCore RISC-V processor, and 100% on a 9-command valid file from
 Tenstorrent.** Details in Part 2.
 
-| Metric | Value |
-|---|---|
-| Real open-source projects | 2 (AnyCore RISC-V, Tenstorrent AOU) |
-| Real-project findings | 4013 across 38 files |
-| Real-project FP rate | **65%** (AnyCore), **100%** (Tenstorrent) |
-| Shipped corpus | 2 files (1 external run, see note) |
-| Findings | 34 shipped-corpus (95 including the external run) |
-| False positives | **15 of 34 (44%)** shipped corpus; **53 of 95 (56%)** including external |
-| Genuine / needs-review | 19 (56%) |
-| Tool-generated file | **0% FP** |
+| Metric | v0.3.0 (pre-fix) | Current |
+|---|---|---|
+| Real open-source projects | 2 (AnyCore RISC-V, Tenstorrent AOU) | not re-measured |
+| Real-project findings | 4013 across 38 files | not re-measured |
+| Real-project FP rate | 65% (AnyCore), 100% (Tenstorrent) | not re-measured |
+| Shipped corpus FP rate | 15 of 34 (44%) | **0 of 21 (0.0%)** |
+| Genuine / needs-review | 19 (56%) | 21 (100%) |
+| Tool-generated file | 0% FP | 0% FP |
 
 > **Note on the external file.** The headline 56% figure includes one
 > third-party UPF (a 204-line UPF 2.1 SoC from an unrelated local project).
@@ -285,42 +300,57 @@ calibration, which was not tested because no reference tool exists here.
 
 ## Required improvements, in priority order
 
-**P0 — multi-line brace groups (D4). Highest impact of everything found.**
-Track brace/bracket depth across newlines in `preprocess()` and only split a
-command at depth 0. This one change removes 505 spurious `UPF-001`, restores
-element lists for 138 domains the tool currently sees as empty, and stops the
-phantom `-include_scope` domain. Until it lands, every element-based check is
-running on an empty model.
+**DONE — multi-line brace groups (D4).** `preprocess()` now tracks
+brace/bracket depth across newlines and splits only at depth 0, so a
+multi-line `-elements { ... }` is one command. A malformed unbalanced brace no
+longer swallows the rest of the file: if the next line starts with a real UPF
+command, the lexer emits what it has (UPF-006 reports the imbalance) and
+resumes. Pinned by `test_multiline_element_list_is_one_command` and
+`test_multiline_domain_keeps_its_elements`.
 
-**P0 — grammar coverage (D1).** Accept the 9 legal options and model them:
-994 false positives, and it un-breaks switch modeling, which also clears the
-D1/D5 cascade.
+**DONE — grammar coverage (D1).** The legal spellings are accepted and modeled:
+`-include_scope` on `create_power_domain`, the `_power_net`/`_ground_net`
+isolation and retention forms, `-location` on the control commands, and both
+the 2.1/3.0 and 3.1+ switch supply spellings. `_REQUIRED_OPTIONS` now takes
+interchangeable spelling groups, so `create_power_switch` accepts
+`-input_supply` or `-input_supply_port` rather than demanding one exact token.
 
-**P0 — brace-group expansion.** Split `{ a b c }` into members for
-`-ports`/`-nets`/`-elements`. Tcl requires it; real files use it constantly.
+**DONE — brace-group expansion.** `{ a b c }` is split into members for
+`-ports`/`-nets`/`-elements`. `connect_supply_net` records one entry per
+resolved target rather than appending the raw `{ ... }` value, which is what
+made UPF-024 report one unknown target named `'{ VDD_TOP }'`.
 
-**P1 — `map_power_switch`.** Add to `_SUPPORTED` with the same shape as the
-existing `map_*_cell` handlers.
+**DONE — `map_power_switch`.** Added to `_SUPPORTED` and `_LEGAL_OPTIONS` with
+the same shape as the existing `map_*_cell` handlers.
 
-**P0 — supply-port pairs (D5).** Split `{vin VDD}` into name and value before
-use as a supply reference. 238 false positives.
+**DONE — supply-port pairs (D5).** `_supply_value()` unwraps a `{-port supply}`
+pair and prefers the supply half, and it accepts both the `_supply` and
+`_power_net` spellings across switch, isolation, retention, and repeater
+strategies.
 
-**P1 — `UPF-081` bare-signal lookup.** Split `{sig polarity}` before checking
-`design.has_signal()`. Demonstrated against a real netlist: `iso_en` exists
-but `{iso_en high}` does not, so a valid design is flagged.
+**OPEN — P1 — `UPF-081` bare-signal lookup.** Split `{sig polarity}` before
+checking `design.has_signal()`. Demonstrated against a real netlist: `iso_en`
+exists but `{iso_en high}` does not, so a valid design is flagged.
 
-**P1 — `UPF-002` severity.** An option the engine has not implemented is
+**OPEN — P1 — `UPF-002` severity.** An option the engine has not implemented is
 `UNSUPPORTED` support, not `VALIDATED`. Tagging a known-unimplemented option
 as `VALIDATED` is exactly the over-claim `CLAUDE.md` forbids. Suggested:
 `severity="warning"`, `support="UNSUPPORTED"` until the option is modeled.
+This matters more now that the grammar accepts the real option set: an
+accepted-but-unmodeled option is more likely to be hit than before.
 
-**P2 — `UPF-001` severity.** Unknown-command is right at *error* for genuinely
-unknown commands, but a command the standard defines and the engine lacks
-should be `warning` + `UNSUPPORTED`, not an error.
+**OPEN — P2 — `UPF-001` severity.** Unknown-command is right at *error* for
+genuinely unknown commands, but a command the standard defines and the engine
+lacks should be `warning` + `UNSUPPORTED`, not an error.
 
-**P2 — differential testing.** Install OpenSTA/Yosys + a UPF parser (or a
-reference `check_power_intent`) to settle severity calibration by comparison
+**OPEN — P2 — differential testing.** Install OpenSTA/Yosys + a UPF parser (or
+a reference `check_power_intent`) to settle severity calibration by comparison
 rather than by reasoning.
+
+**OPEN — re-measure the external projects.** The 0.0% shipped-corpus rate is
+measured; the AnyCore and Tenstorrent rates are not. Re-running them is the
+only way to confirm the grammar fixes generalise past the corpus, and it is
+the honest next step before claiming the false-positive problem is closed.
 
 **P3 — conformance corpus.** Widen `tests/corpus/` beyond these three files
 toward public IEEE 1801 examples, and gate CI on the FP-rate from

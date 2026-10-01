@@ -10,9 +10,23 @@ no execution, and every emitted record carries its provenance (file, line).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List
+
+#: Command names that can legitimately start a new logical command while the
+#: lexer is inside an unbalanced brace. Used for recovery only — a line that
+#: begins with one of these is treated as a fresh command, which stops a single
+#: stray ``{`` from swallowing the remainder of the file.
+#:
+#: This is what lets the lexer honour multi-line ``-elements { ... }`` lists
+#: *and* still survive malformed input. The unbalanced construct is preserved
+#: in the record text, so UPF-006 still reports it.
+_COMMAND_START = re.compile(
+    r"^(?:upf_version|set_design_top|set_scope|create_\w+|connect_\w+|"
+    r"add_\w+|set_\w+|update_\w+|map_\w+|load_upf|upf_\w+)\b"
+)
 
 
 @dataclass(frozen=True)
@@ -82,9 +96,25 @@ def preprocess(text: str, file: str = "<string>") -> List[CommandRecord]:
             i += 1
             continue
 
-        # --- physical end of line: command terminator ---
+        # --- physical end of line ---
+        #
+        # A newline terminates a command only at depth zero. Inside braces,
+        # brackets, or a double-quoted string it is ordinary whitespace, so a
+        # multi-line `-elements { ... }` list stays one logical command.
+        #
+        # Recovery: if we are inside a construct that never closes and the next
+        # line begins with a real UPF command, the brace was unbalanced. Emit
+        # what we have (UPF-006 reports the imbalance) and resume at depth 0,
+        # rather than swallowing the rest of the file.
         if c == "\n":
-            flush()
+            if brace == 0 and bracket == 0 and not dq:
+                flush()
+            elif _COMMAND_START.match(text[i + 1:].lstrip()) and not dq:
+                flush()
+                brace = bracket = 0
+            else:
+                buf.append(" ")
+                mark()
             line += 1
             i += 1
             continue

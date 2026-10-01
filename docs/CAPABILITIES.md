@@ -136,15 +136,25 @@ failure. `--gate`/`--baseline` apply policy to CI pipelines.
 
 | Property | Status |
 |---|---|
-| Test suite | 302 passing (+4 xfail documenting known parser defects) |
+| Test suite | 309 passing (no xfail remaining) |
 | Mutation corpus | 42/42 seeded defects detected (100% recall) |
 | Mutation precision | **0.57** — the engine fires on 43% of its own findings |
-| Real-world FP rate | **44%** on `tests/corpus/` (15 of 34); **56%** including an external third-party UPF |
+| Real-world FP rate | **0%** on `tests/corpus/` (0 of 21); all 21 findings are genuine / needs-review |
 | Registry/handler parity | exact, audit-clean |
 | Determinism | byte-identical on repeat runs |
 
-Recall is excellent; **precision is the weakness**. Both numbers are the honest
-measure of where this tool stands today.
+Recall is excellent; **precision on the shipped corpus is now clean.** The
+caveat worth stating plainly: 0% is measured on the two files in
+`tests/corpus/`, one of which we wrote ourselves to cover legal option
+spellings. The external open-source projects measured in
+`docs/validation/REAL_WORLD_REPORT.md` (65% at v0.3.0) have not been
+re-measured — that UPF is not redistributed here. Those defects have been
+fixed at the grammar, so 65% is a historical upper bound rather than a current
+claim, but confirming it means re-running those corpora.
+
+Recall is excellent; **precision is the remaining weakness**, and the evidence
+for that is now confined to the mutation corpus (0.57) and the un-re-measured
+external projects.
 
 ## Who should use it
 

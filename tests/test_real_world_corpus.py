@@ -8,8 +8,10 @@ using the legal IEEE 1801 option spellings the v0.3.0 grammar rejected.
 The corpus is expected to be CLEAN. Findings here are tool defects unless a
 test says otherwise — see docs/validation/REAL_WORLD_REPORT.md.
 
-Once the P0 grammar work lands, delete the `xfail` markers and invert them to
-hard assertions. That inversion is the acceptance criterion.
+The P0 grammar work has landed: every former `xfail` marker is inverted to a
+hard assertion. Syntax-layer rules (UPF-001/002/003/024) must stay silent on
+this legal UPF; the semantic advisories that remain are real and are pinned by
+`test_semantic_checks_still_fire_on_real_upf`.
 """
 
 from __future__ import annotations
@@ -43,7 +45,6 @@ def test_corpus_is_present():
     assert files, "tests/corpus is empty — real-world validation would be skipped"
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect - see docs/validation/REAL_WORLD_REPORT.md")
 def test_legal_option_forms_are_not_rejected():
     """IEEE 1801 defines these options; UPF-002 must not fire on them.
 
@@ -72,7 +73,6 @@ def test_legal_option_forms_are_not_rejected():
     assert "Illegal option '-domain' for command 'create_power_switch'" not in messages
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect - see docs/validation/REAL_WORLD_REPORT.md")
 def test_map_power_switch_is_known():
     """map_power_switch is defined by the standard and must not be UPF-001."""
     from upf_insight.engine.engine import validate
@@ -83,7 +83,6 @@ def test_map_power_switch_is_known():
     assert not unknown, f"map_power_switch reported as unknown: {unknown}"
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect - see docs/validation/REAL_WORLD_REPORT.md")
 def test_brace_group_ports_are_expanded():
     """`-ports { VDD_TOP }` is one port, not a literal brace token.
 
@@ -97,7 +96,6 @@ def test_brace_group_ports_are_expanded():
     assert not brace_fps, f"brace group not expanded: {brace_fps}"
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect - see docs/validation/REAL_WORLD_REPORT.md")
 def test_switches_are_connected_to_supplies():
     """A switch parsed with null supplies means the grammar dropped options.
 
@@ -137,7 +135,6 @@ def test_false_positive_rate_is_reported():
     assert "false_positive_rate" in payload
     assert payload["findings"] > 0
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D4) - see REAL_WORLD_REPORT.md Part 2")
 def test_multiline_element_list_is_one_command():
     """A brace group spanning lines is ONE command, not N+1.
 
@@ -170,7 +167,6 @@ def test_multiline_element_list_is_one_command():
     )
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D4) - see REAL_WORLD_REPORT.md Part 2")
 def test_multiline_domain_keeps_its_elements():
     """The domain must retain its instance list, not parse as empty."""
     from upf_insight.engine.engine import validate_records
@@ -197,7 +193,6 @@ def test_multiline_domain_keeps_its_elements():
     )
 
 
-@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D5) - see REAL_WORLD_REPORT.md Part 2")
 def test_supply_port_pair_is_split():
     """`-input_supply_port {vin VDD}` is a pair, not one supply named '{vin VDD}'."""
     from upf_insight.engine.engine import validate_records

@@ -7,26 +7,68 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed - real-world false positives (shipped corpus now 0%)
+
+The parser and grammar defects recorded in the v0.3.0 validation report are
+fixed. False-positive rate on `tests/corpus/` goes from **44% (15 of 34) to 0%
+(0 of 21)**; all 21 remaining findings are genuine / needs-review advisories.
+
+- **Multi-line brace groups (D4)** — `preprocess()` now tracks brace/bracket
+  depth across newlines and splits a command only at depth 0, so a multi-line
+  `-elements { ... }` is one command rather than N+1 phantom commands. An
+  unbalanced brace no longer swallows the rest of the file: if the next line
+  begins with a real UPF command, the lexer emits what it has (UPF-006 reports
+  the imbalance) and resumes at depth 0.
+- **Grammar coverage (D1)** — accepts and models the legal IEEE 1801 spellings
+  the engine previously rejected: `-include_scope` on `create_power_domain`,
+  `-isolation_power_net`/`-isolation_ground_net`,
+  `-retention_power_net`/`-retention_ground_net`, and `-location` on the
+  isolation/level-shifter/repeater control commands.
+- **Interchangeable required options** — `_REQUIRED_OPTIONS` now takes spelling
+  groups, so `create_power_switch` accepts the 2.1/3.0 `-input_supply` or the
+  3.1+ `-input_supply_port` rather than demanding one exact token (UPF-003).
+- **Brace-group expansion** — `connect_supply_net` records one entry per
+  resolved target instead of appending the raw `{ ... }` value, which is what
+  made UPF-024 report one unknown target named `'{ VDD_TOP }'`.
+- **Supply-port pairs (D5)** — `_supply_value()` unwraps a `{-port supply}` pair
+  and prefers the supply half, accepting both the `_supply` and `_power_net`
+  spellings across switch, isolation, retention, and repeater strategies.
+- **`map_power_switch`** — added to `_SUPPORTED` and `_LEGAL_OPTIONS`, matching
+  the existing `map_*_cell` handlers.
+
+All five former `xfail(strict=True)` markers in `tests/test_real_world_corpus.py`
+are inverted to hard assertions — the acceptance criterion set by the validation
+report. `test_semantic_checks_still_fire_on_real_upf` pins that the real checks
+still fire, so none of this was bought by disabling checks.
+
+The external open-source projects measured at v0.3.0 (65% FP on AnyCore, 100%
+on Tenstorrent) have **not** been re-measured — that UPF is not redistributed
+in this repository. Their defects were grammar-level and are fixed, so those
+figures are a historical upper bound, not a current claim. See
+`docs/validation/REAL_WORLD_REPORT.md`.
+
 ### Added - real-world validation (tag v0.3.0-validation.1)
 
 - `scripts/validate_corpus.py` — runs the CLI over an external UPF corpus,
   buckets every finding by root cause, and reports a false-positive rate.
   Prints an `unclassified` bucket so new failure modes surface rather than
   counting as genuine.
-- `tests/corpus/` — three files: a hand-written file exercising legal IEEE 1801
-  option spellings, a real third-party SoC UPF (UPF 2.1, 4 domains, 3 power
-  switches), and a UPF-Insight-generated file as a control.
-- `tests/test_real_world_corpus.py` — regression guard. Four tests are marked
-  `xfail(strict=True)` for the documented parser defects; they flip to
-  passing when fixed and fail loudly if a defect changes shape. Three assert
-  the semantic checks still fire, so the defects cannot be "fixed" by
-  disabling real checks.
+- `tests/corpus/` — two shipped files: a hand-written file exercising legal
+  IEEE 1801 option spellings, and a UPF-Insight-generated file as a control.
+  (A third file — a real third-party SoC UPF, UPF 2.1, 4 domains, 3 power
+  switches — was measured but is **not** redistributed here; it belongs to
+  another project. See the report's note on the external file.)
+- `tests/test_real_world_corpus.py` — regression guard. As shipped, four tests
+  were marked `xfail(strict=True)` for the documented parser defects; they
+  flipped to passing when fixed, and are now inverted to hard assertions (see
+  the Fixed section above). Three assert the semantic checks still fire, so the
+  defects cannot be "fixed" by disabling real checks.
 - `docs/CAPABILITIES.md` — what the tool does and does not do, bounded by
   measurement rather than aspiration.
 - `docs/validation/REAL_WORLD_REPORT.md` — methodology, corpus, per-defect
   analysis, and prioritized improvements.
 
-### Measured result
+### Measured result at v0.3.0 (superseded for the shipped corpus — see Fixed above)
 
 **56% false-positive rate on UPF the tool did not write** (53 of 95 findings),
 against a 100% mutation-detection rate on defects the same author injected.

@@ -57,20 +57,23 @@ _SUPPORTED = {
     "map_isolation_cell",
     "map_level_shifter_cell",
     "map_retention_cell",
+    "map_power_switch",
     "upf_promote",
     "upf_demote",
 }
 
 # Legal options per supported command (UPF 2.1/3.0 grammar). Used by UPF-002.
 _LEGAL_OPTIONS = {
-    "create_power_domain": {"-elements", "-primary_supply_set", "-supply", "-update"},
+    "create_power_domain": {"-elements", "-primary_supply_set", "-supply",
+                            "-include_scope", "-update"},
     "set_scope": set(),
     "load_upf": {"-scope", "-supply", "-update"},
     "create_supply_net": {"-resolve", "-update"},
     "create_supply_port": {"-direction", "-domain", "-update"},
     "create_supply_set": {"-function", "-power", "-ground", "-update"},
     "connect_supply_net": {"-ports", "-nets", "-resolve"},
-    "create_power_switch": {"-input_supply_port", "-output_supply_port",
+    "create_power_switch": {"-domain", "-input_supply", "-output_supply",
+                            "-input_supply_port", "-output_supply_port",
                             "-control_port", "-on_state", "-off_state", "-update"},
     "add_port_state": {"-state", "-update"},
     "add_supply_state": {"-state", "-update"},
@@ -78,22 +81,27 @@ _LEGAL_OPTIONS = {
     "create_pst": {"-supplies", "-update"},
     "add_pst_state": {"-pst", "-state", "-is_directed", "-complete", "-update"},
     "add_state_transition": {"-state", "-next_state"},
-    "set_isolation": {"-domain", "-elements", "-isolation_supply", "-clamp_value",
-                      "-location", "-applies_to", "-isolation_signal",
-                      "-no_isolation", "-source", "-sink", "-update"},
+    "set_isolation": {"-domain", "-elements", "-isolation_supply",
+                      "-isolation_power_net", "-isolation_ground_net",
+                      "-clamp_value", "-location", "-applies_to",
+                      "-isolation_signal", "-no_isolation", "-source",
+                      "-sink", "-update"},
     "set_level_shifter": {"-domain", "-elements", "-location", "-threshold",
                           "-rule", "-applies_to", "-update"},
     "set_retention": {"-domain", "-elements", "-retention_supply",
+                      "-retention_power_net", "-retention_ground_net",
                       "-save_signal", "-restore_signal", "-update"},
     "set_repeater": {"-domain", "-elements", "-repeater_supply", "-location",
                      "-driver_type", "-sense", "-inverted", "-repeater_signal",
                      "-repeater_isolation_supply", "-update"},
     "set_isolation_control": {"-domain", "-isolation_signal", "-isolation_sense",
-                              "-isolation_condition", "-update"},
+                              "-isolation_condition", "-isolation_power_net",
+                              "-isolation_ground_net", "-location", "-update"},
     "set_retention_control": {"-domain", "-retention_signal", "-save_signal",
                               "-restore_signal", "-update"},
-    "set_level_shifter_control": {"-domain", "-level_shifter_signal", "-update"},
-    "set_repeater_control": {"-domain", "-repeater_signal", "-update"},
+    "set_level_shifter_control": {"-domain", "-level_shifter_signal",
+                                  "-location", "-update"},
+    "set_repeater_control": {"-domain", "-repeater_signal", "-location", "-update"},
     "set_domain_supply_net": {"-primary_power_net", "-primary_ground_net", "-update"},
     "set_port_attributes": {"-attribute", "-update"},
     "set_equivalent": {"-nets", "-ports", "-sets", "-update"},
@@ -102,11 +110,18 @@ _LEGAL_OPTIONS = {
     "map_isolation_cell": {"-domain", "-lib_cells", "-elements", "-update"},
     "map_level_shifter_cell": {"-domain", "-lib_cells", "-elements", "-update"},
     "map_retention_cell": {"-domain", "-lib_cells", "-elements", "-update"},
+    "map_power_switch": {"-domain", "-lib_cells", "-elements", "-update"},
     "upf_promote": {"-net", "-port", "-set", "-domain", "-update"},
     "upf_demote": {"-net", "-port", "-set", "-domain", "-update"},
 }
 
 # Options whose absence is a hard error (UPF-003).
+#
+# Each entry is a tuple of *requirements*; each requirement is a tuple of
+# interchangeable spellings, and satisfying any one of them is enough. A bare
+# string is a single-spelling requirement. IEEE 1801 defines both the 2.1/3.0
+# and the 3.1+ spelling for several switch options, so demanding one exact
+# token would reject a legal file.
 _REQUIRED_OPTIONS = {
     "set_isolation": ("-domain",),
     "set_level_shifter": ("-domain",),
@@ -118,7 +133,10 @@ _REQUIRED_OPTIONS = {
     "set_repeater_control": ("-domain",),
     "add_pst_state": ("-pst",),
     "add_state_transition": ("-next_state",),
-    "create_power_switch": ("-input_supply_port", "-output_supply_port"),
+    "create_power_switch": (
+        ("-input_supply", "-input_supply_port"),
+        ("-output_supply", "-output_supply_port"),
+    ),
 }
 
 #: UPF versions the model builder understands (UPF-004).
@@ -309,12 +327,16 @@ def _syntax_check(model: PowerIntentModel, cmd: str, tokens: List[str], rec: Com
             })
 
     # UPF-003 - missing required argument.
-    for opt in _REQUIRED_OPTIONS.get(cmd, ()):
-        if opt not in tokens:
+    for requirement in _REQUIRED_OPTIONS.get(cmd, ()):
+        # A requirement is either a single option or a group of interchangeable
+        # spellings; the group passes if any member is present.
+        spellings = (requirement,) if isinstance(requirement, str) else requirement
+        if not any(opt in tokens for opt in spellings):
+            # Report the first (canonical) spelling so the message stays stable.
             model.syntax_issues.append({
                 "rule": "UPF-003", "support": "VALIDATED", "line": line,
-                "message": f"Missing required argument '{opt}' for command "
-                           f"'{cmd}'.",
+                "message": f"Missing required argument '{spellings[0]}' for "
+                           f"command '{cmd}'.",
             })
 
     # UPF-004 - unsupported version.
@@ -344,6 +366,28 @@ def _get_opt(args: List[str], opt: str, default: Optional[str] = None) -> Option
 
 def _get_flag(args: List[str], flag: str) -> bool:
     return flag in args
+
+
+def _supply_value(args: List[str], *opts: str) -> Optional[str]:
+    """Resolve a supply reference, trying each option spelling in order.
+
+    A value may be a bare name (``VDD``) or a Tcl pair carrying a port and a
+    supply (``{vin VDD}``). The pair's *supply* is what later rules compare
+    against declared nets and sets, so the braces are unwrapped here rather
+    than being carried forward as a literal token.
+    """
+    for opt in opts:
+        val = _get_opt(args, opt)
+        if val is None:
+            continue
+        cleaned = val.strip()
+        if cleaned.startswith("{") and cleaned.endswith("}"):
+            parts = cleaned.strip("{}").split()
+            if parts:
+                return parts[-1] if len(parts) > 1 else parts[0]
+            return None
+        return cleaned or None
+    return None
 
 
 def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRecord,
@@ -420,7 +464,7 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         )
     elif cmd == "connect_supply_net":
         net = args[0] if args else None
-        target = _get_opt(args, "-ports") or _get_opt(args, "-nets")
+        targets = _split_opt(args, "-ports") or _split_opt(args, "-nets")
         if net:
             key = model.scope_key(net, model.current_scope)
             entry = model.supply_nets.get(key)
@@ -428,19 +472,27 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 entry = SupplyNet(name=net, scope=model.current_scope, declared_line=line,
                                   declared_file=rec.file)
                 model.supply_nets[key] = entry
-            if target:
-                for t in _split_opt(args, "-ports") or _split_opt(args, "-nets"):
-                    _track_reference(model, "connect", t, line)
-                entry.connected_to.append(target)
+            # One record per resolved target, so `-ports { A B }` connects to
+            # both A and B. Appending the raw option value would carry the
+            # braces into the model and make UPF-024 see one unknown target
+            # named '{ A B }' instead of two known ports.
+            for t in targets:
+                _track_reference(model, "connect", t, line)
+                entry.connected_to.append(t)
     elif cmd == "create_power_switch":
         name = args[0] if args else "?"
         on_name, on_supply, on_cond = _split_state_expr(_get_opt(args, "-on_state") or "")
         off_name, _off_supply, off_cond = _split_state_expr(_get_opt(args, "-off_state") or "")
+        # IEEE 1801 defines two spellings: UPF 2.1/3.0 use -input_supply /
+        # -output_supply (optionally a {-port supply} pair); UPF 3.1+ use
+        # -input_supply_port / -output_supply_port. Accept either.
+        in_supply = _supply_value(args, "-input_supply", "-input_supply_port")
+        out_supply = _supply_value(args, "-output_supply", "-output_supply_port")
         switch = PowerSwitch(
             name=name,
             scope=model.current_scope,
-            input_supply=_get_opt(args, "-input_supply_port"),
-            output_supply=_get_opt(args, "-output_supply_port"),
+            input_supply=in_supply,
+            output_supply=out_supply,
             control_port=_get_opt(args, "-control_port"),
             on_state=on_name or None,
             off_state=off_name or None,
@@ -450,10 +502,10 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             declared_line=line,
             declared_file=rec.file,
         )
-        for opt in ("-input_supply_port", "-output_supply_port"):
-            v = _get_opt(args, opt)
-            if v:
-                _track_reference(model, "supply", v, line)
+        if in_supply:
+            _track_reference(model, "supply", in_supply, line)
+        if out_supply:
+            _track_reference(model, "supply", out_supply, line)
         _track_definition(model, "switch", name, line)
         model.switches[model.scope_key(name, model.current_scope)] = switch
     elif cmd == "create_pst":
@@ -497,7 +549,9 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 elements=_split_opt(args, "-elements"),
                 clamp_value=_get_opt(args, "-clamp_value"),
                 location=_get_opt(args, "-location", "self"),
-                isolation_supply=_get_opt(args, "-isolation_supply"),
+                isolation_supply=_supply_value(
+                    args, "-isolation_supply",
+                    "-isolation_power_net"),
                 control_signal=_get_opt(args, "-isolation_signal"),
                 applies_to=_get_opt(args, "-applies_to", "outputs"),
                 declared_line=line,
@@ -538,7 +592,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 sense=_get_opt(args, "-sense"),
                 inverted=_get_flag(args, "-inverted"),
                 signal=_get_opt(args, "-repeater_signal"),
-                isolation_supply=_get_opt(args, "-repeater_isolation_supply"),
+                isolation_supply=_supply_value(
+                    args, "-repeater_isolation_supply"),
                 declared_line=line,
                 declared_file=rec.file,
             )
@@ -552,7 +607,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             RetentionStrategy(
                 domain=domain,
                 elements=_split_opt(args, "-elements"),
-                retention_supply=_get_opt(args, "-retention_supply"),
+                retention_supply=_supply_value(
+                    args, "-retention_supply", "-retention_power_net"),
                 save_signal=_get_opt(args, "-save_signal"),
                 restore_signal=_get_opt(args, "-restore_signal"),
                 declared_line=line,
@@ -720,7 +776,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 if val:
                     entry.functions[opt.lstrip("-")] = val
                     _track_reference(model, "supply", val, line)
-    elif cmd in ("map_isolation_cell", "map_level_shifter_cell", "map_retention_cell"):
+    elif cmd in ("map_isolation_cell", "map_level_shifter_cell", "map_retention_cell",
+                "map_power_switch"):
         model.library_mappings.append({"cmd": cmd, "line": line})
     elif cmd in ("upf_promote", "upf_demote"):
         name = (_get_opt(args, "-net") or _get_opt(args, "-port")
