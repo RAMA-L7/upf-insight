@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
 import pytest
@@ -100,8 +101,13 @@ def _post(base, body, path="/api/validate", extra_headers=None):
     try:
         with urlopen(req, timeout=5) as r:
             return r.status, r.read()
-    except Exception as e:  # HTTPError for 4xx
-        return getattr(e, "code", None), b""
+    except HTTPError as e:
+        # Only a real HTTP status counts. A transport failure must surface as
+        # itself, not collapse to None -- masking it here is what made these
+        # assertions intermittently fail for the wrong reason.
+        return e.code, b""
+    except Exception as e:  # URLError, RemoteDisconnected, timeouts
+        return type(e).__name__, b""
 
 
 def test_valid_body_still_returns_200(server):

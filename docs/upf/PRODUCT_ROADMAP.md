@@ -1,7 +1,12 @@
 # UPF-Insight — Product Roadmap
 
 > **Document kind:** product roadmap.
-> **Date:** 2026-08-14 · **Version:** v0.1.0
+> **Date:** 2026-10-01 · **Version:** v0.3.0 (see `pyproject.toml`)
+
+> **This document is a snapshot, regenerated from the code.** Figures below
+> are read from the registry, the test suite, and `engine/quality.py` — not
+> carried forward by hand. If a number here disagrees with the code, the code
+> wins; regenerate rather than edit.
 
 ---
 
@@ -11,58 +16,90 @@ UPF-Insight is the power-intent quality layer that runs **before** power-aware
 implementation — the low-power sibling of the Ṛta SDC validator. Deterministic,
 local-first, honest about its support boundary.
 
-## Now — v0.1.0 (scaffold, shipped)
+## Where we are — v0.3.0 (shipped)
 
-- Full repo skeleton mirroring the sdc-tools layout: package, CLI, docs,
-  tests, examples.
-- Preprocess → model build → check → support boundary → PST pipeline.
-- Layers 1–5 rule catalog (registry contract), initial handlers for:
-  UPF-001, 011, 020, 022, 023, 032, 034, 045, 050, 052, 060.
-- Commands: `check`, `model`, `pst`, `diff`, `generate`, `web`.
-- 8-test core engine suite; golden known-good/known-bad fixtures.
+| Metric | Value | Source |
+|---|---|---|
+| Registered rules | **77** (UPF-001…100) | `rules_registry.registered_rules()` |
+| Registry/handler parity | **exact**, audit clean | `rules/audit.py` |
+| Test suite | **299 passing** | `python -m pytest tests/ -q` |
+| Mutation corpus | **42 / 42 detected** (100%) | `engine/quality.py` |
+| Mutation precision | **0.57** overall, **0.74** on errors | `engine/quality.py` |
+| CLI subcommands | 16 top-level (+3 under `rules`) | `cli/cli.py` |
+| Python | 3.10+, stdlib-only core, `pyyaml` the sole dependency | `pyproject.toml` |
 
-## Next — v0.2.0 (rule completeness)
+Rule layers: STRATEGY 36 · PST 10 · REFERENCE 10 · DESIGN 8 · SYNTAX 6 ·
+SUPPLY_DOMAIN 6 · SUPPLY 1.
 
-- Complete Layer 1–2 handlers: option validation (UPF-002/003), duplicate
-  detection (UPF-013), use-before-definition (UPF-014), scope checks.
-- Complete Layer 4: UPF-030/031/033/035/036 against the PST analyzer.
-- Complete Layer 5 isolation set: UPF-040…047 (isolation supply/location,
-  applies_to, clamp).
-- Custom rules (YAML) — first-class user-defined rulesets.
-- Reports: JUnit/HTML + `--junit` flag for CI.
+### Shipped in v0.3.0
 
-## Later — v0.3.0 (readiness & diff depth)
+- Preprocess → model → check → support-boundary → PST → readiness pipeline,
+  with semantic diff, generator, batch/lint/convert tools, and a local web UI.
+- **Cross-file scope semantics** — scope is per-file state; `load_upf -scope`
+  establishes the child's scope per IEEE 1801. Results no longer depend on the
+  order files are listed on the command line.
+- **PST transition context** — `add_state_transition` applies to the table
+  currently being defined, not to every table.
+- **Generated rules reference** — `docs/upf/RULES_REGISTRY.md` is built from
+  the live registry and guarded by a drift test, so it cannot fall behind again.
+- Honest support boundary: internal rule errors report `NOT_VALIDATED`, never
+  `VALIDATED`; `support_boundary` is populated on every run.
 
-- **Readiness** model (seven power-intent dimensions, aggregate verdict:
-  READY / READY_WITH_ADVISORIES / REVIEW_REQUIRED / BLOCKED /
-  INSUFFICIENT_CONTEXT).
-- **Diff** upgrades: saved-baseline snapshots (JSON), finding identity,
-  trust/coverage deltas, gate policies (`--gate`) + exit-code enforcement.
-- Full level-shifter + retention + switch rule families.
+## Next — v0.4.0 (precision and reach)
+
+The mutation corpus detects every seeded defect but fires on **43% of its
+findings** (precision 0.57). That is the clearest measure of the gap between
+"catches the bug" and "tells you something true". v0.4.0 is about closing it.
+
+- **Precision work** — triage the non-error findings the mutation corpus
+  provokes; either sharpen the rules or demote what cannot be decided without
+  a netlist. Target: error-precision above 0.9.
+- **Retention coverage (UPF-083)** — compare declared retention against actual
+  sequential elements. Catches both under-retention (silent corruption) and
+  over-retention (2–3× area on don't-care flops), which is invisible today.
+- **Endpoint crossing coverage (UPF-082)** — with a netlist, compute real
+  domain crossings and diff them against declared strategies. This is the
+  change that moves the tool from *"you declared isolation for PD_CORE"* to
+  *"these 14 signals reach PD_AON with no strategy"*.
+- **CI first-class** — a GitHub Action and pre-commit hook. The engine is
+  deterministic with a 0/1/2/3 exit contract and is already CI-shaped; nothing
+  uses it yet.
+
+## Later — v0.5.0 (adoption)
+
+- **Baseline workflow** — `--save-baseline` / `--baseline` / `--gate` exist;
+  what is missing is the flow: review findings → accept → save → gate future
+  PRs against it.
+- **`set_port_attributes` depth** — `always_on`, `supply`, and isolation
+  attributes are parsed shallowly. Deeper inference converts several
+  `PARTIAL`/`NETLIST_REQUIRED` statuses to `VALIDATED`.
+- **Open-source conformance corpus** — parse public IEEE 1801 examples. Makes
+  the support boundary concrete instead of theoretical.
 
 ## v1.0 (production hardening)
 
-- 100+ evidence test suite (mutation-tested rule set).
-- Conformance corpus: parse open-source IEEE 1801 examples for the support
-  boundary.
-- Packaging polish, CI actions, pre-commit hooks.
-- Retention-coverage helper: sequential-element vs retention strategy
-  alignment (needs netlist — see v2).
+- Packaging polish, release automation, signature/provenance on reports.
+- Multi-corner and DVFS operating-point modeling.
+- Power-state groups and macros (UPF 3.0/4.0 depth).
 
-## v2.0 (design-aware)
+## Known gaps (verified, not scheduled)
 
-- **Netlist/RTL context** reader (mirrors sdc-tools `design_context`):
-  - Instance existence (UPF-080)
-  - Control-signal existence (UPF-081)
-  - Endpoint-based crossing coverage (UPF-082)
-  - Retention coverage vs actual flops (UPF-083)
-  - Library PG mapping (UPF-084)
-- Power-state group and macro support (UPF 3.0/4.0 depth).
+Recorded so they are not rediscovered as "bugs":
 
-## v3.0 (team/enterprise)
-
-- Corporate policy rulesets, CI plugins, golden integrations.
-- Formal-adjacent retention helpers and PST formal checking.
+- `differ.py` compares strategies **count-only**; a content change inside an
+  isolation/retention/level-shifter strategy is not detected.
+- `record_files` is keyed by **line number alone**, so two files with commands
+  on the same line are ambiguous. Consumers correctly return "no file" rather
+  than guessing, but the provenance is weaker than it looks.
+- `RepeaterStrategy` carries no `scope` field, so cross-scope duplicate
+  detection is weaker for repeaters than for the other three strategy types.
+- `analyze_pst` analyzes the **first** PST only; a multi-table design gets one
+  table's coverage report.
+- `create_supply_net -resolve`, `create_supply_port -domain`, and
+  `create_pst -supplies` are accepted and then discarded.
+- `add_power_state` is deliberately **not modeled** — it is deprecated in
+  IEEE 1801 and correctly reported by UPF-005. This is intentional, not an
+  oversight.
 
 ## Out of scope (by design)
 

@@ -211,10 +211,14 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
     # child-file basename -> scope established by a prior `load_upf -scope`.
     file_scope: dict = {}
     last_file: Optional[str] = None
+    # Name of the most recent create_pst — the "current table" context that
+    # add_state_transition applies to (IEEE 1801 gives it no -pst option).
+    last_pst_name: Optional[str] = None
     for rec in records:
         if rec.file != last_file:
             model.current_scope = file_scope.get(os.path.basename(rec.file or ""), ".")
             last_file = rec.file
+            last_pst_name = None
         model.commands_seen += 1
         files = model.record_files.setdefault(rec.line, [])
         if rec.file not in files:
@@ -234,7 +238,7 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
             continue
         _syntax_check(model, cmd, tokens, rec)
         seen_loads = len(model.load_upf_events)
-        _dispatch(model, cmd, args, rec)
+        last_pst_name = _dispatch(model, cmd, args, rec, last_pst_name)
         # `load_upf` scopes the child: record basename -> child scope so the
         # boundary above enters that file in the right scope.
         for ev in model.load_upf_events[seen_loads:]:
@@ -342,7 +346,14 @@ def _get_flag(args: List[str], flag: str) -> bool:
     return flag in args
 
 
-def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRecord) -> None:
+def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRecord,
+              last_pst_name: Optional[str] = None) -> Optional[str]:
+    """Apply one command. Returns the updated current-PST name.
+
+    ``add_state_transition`` has no ``-pst`` option in IEEE 1801 — it adds
+    to the table currently being defined, so the ``create_pst`` that set
+    that context has to be carried between commands.
+    """
     line = rec.line
     if cmd == "upf_version":
         model.upf_version = args[0] if args else None
@@ -451,6 +462,7 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         model.psts[model.scope_key(name, model.current_scope)] = Pst(
             name=name, scope=model.current_scope, declared_line=line
         )
+        last_pst_name = name
     elif cmd == "add_pst_state":
         pst_name = _get_opt(args, "-pst")
         state_name = args[0] if args else None
@@ -572,7 +584,21 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         src = args[0] if args else _get_opt(args, "-state")
         dst = _get_opt(args, "-next_state")
         if src and dst:
-            for pst in model.psts.values():
+            # IEEE 1801: add_state_transition carries no -pst option; it adds
+            # to the table currently being defined (the most recent
+            # create_pst in load order). Appending to every table would put
+            # one designer's transition on unrelated power-state tables.
+            key = model.scope_key(last_pst_name, model.current_scope) \
+                if last_pst_name else None
+            pst = model.psts.get(key) if key else None
+            if pst is None:
+                # No table in context: record on the most recently created
+                # one, which is what a single-table file means.
+                for candidate in reversed(list(model.psts.values())):
+                    if candidate.scope == model.current_scope:
+                        pst = candidate
+                        break
+            if pst is not None:
                 pst.transitions.append((src, dst))
     # load_upf is followed in load order; nested loads recorded for scoping.
     # The loaded file name and any -supply mapping (local supply -> parent
@@ -737,6 +763,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             if not name:
                 continue
             model.port_attributes.setdefault(name, []).append(attr or "")
+
+    return last_pst_name
 
 
 def _split_pair(value: str) -> List[str]:

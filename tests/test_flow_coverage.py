@@ -489,3 +489,66 @@ create_pst pst -supplies {vdd vss}
 add_pst_state s0 -pst pst -state {supply_set primary ON}
 """
     assert "UPF-036" not in _codes(text)
+
+
+# ── PST transition context ──────────────────────────────────────────────────
+#
+# IEEE 1801 gives add_state_transition no -pst option: it adds to the table
+# currently being defined. Appending it to every table put one designer's
+# transition on unrelated power-state tables, which then leaked into UPF-033
+# reachability and the PST report.
+
+
+_TWO_PST = SUPPLY_HEADER + """
+create_pst pst_a -supplies {vdd vss}
+add_pst_state a_on  -pst pst_a -state {primary ON}
+add_pst_state a_off -pst pst_a -state {primary OFF}
+create_pst pst_b -supplies {vdd vss}
+add_pst_state b_on  -pst pst_b -state {primary ON}
+add_pst_state b_off -pst pst_b -state {primary OFF}
+create_power_domain PD -elements {u1} -primary_supply_set primary
+"""
+
+
+def test_state_transition_applies_to_current_pst_only():
+    """The transition lands on the table in context, never on every table."""
+    model = build_model(preprocess(
+        _TWO_PST + "add_state_transition a_off -next_state a_on\n", file="t.upf"))
+    assert model.psts["pst_b"].transitions == [("a_off", "a_on")]
+    assert model.psts["pst_a"].transitions == []
+
+
+def test_state_transition_targets_its_own_pst():
+    """A transition issued while pst_a is in context stays on pst_a."""
+    text = SUPPLY_HEADER + """
+create_pst pst_a -supplies {vdd vss}
+add_pst_state a_on  -pst pst_a -state {primary ON}
+add_pst_state a_off -pst pst_a -state {primary OFF}
+add_state_transition a_off -next_state a_on
+create_pst pst_b -supplies {vdd vss}
+add_pst_state b_on  -pst pst_b -state {primary ON}
+create_power_domain PD -elements {u1} -primary_supply_set primary
+"""
+    model = build_model(preprocess(text, file="t.upf"))
+    assert model.psts["pst_a"].transitions == [("a_off", "a_on")]
+    assert model.psts["pst_b"].transitions == []
+
+
+def test_state_transition_does_not_cross_file_boundary():
+    """PST context is per-file, like scope."""
+    a = SUPPLY_HEADER + """
+create_pst pst_a -supplies {vdd vss}
+add_pst_state a_on  -pst pst_a -state {primary ON}
+add_pst_state a_off -pst pst_a -state {primary OFF}
+create_power_domain PD -elements {u1} -primary_supply_set primary
+"""
+    b = SUPPLY_HEADER + """
+create_pst pst_b -supplies {vdd vss}
+add_pst_state b_on  -pst pst_b -state {primary ON}
+add_pst_state b_off -pst pst_b -state {primary OFF}
+add_state_transition b_off -next_state b_on
+create_power_domain PD2 -elements {u2} -primary_supply_set primary
+"""
+    res = _check_files(("a.upf", a), ("b.upf", b))
+    assert res.check.model.psts["pst_a"].transitions == []
+    assert res.check.model.psts["pst_b"].transitions == [("b_off", "b_on")]
