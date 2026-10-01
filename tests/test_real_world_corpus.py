@@ -136,3 +136,87 @@ def test_false_positive_rate_is_reported():
     payload = _codes("ieee1801_upf21_forms.upf")
     assert "false_positive_rate" in payload
     assert payload["findings"] > 0
+
+@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D4) - see REAL_WORLD_REPORT.md Part 2")
+def test_multiline_element_list_is_one_command():
+    """A brace group spanning lines is ONE command, not N+1.
+
+    Real UPF writes element lists across lines:
+        create_power_domain PD -elements {
+        inst0
+        inst1
+        }
+    The v0.3.0 preprocessor splits at every newline regardless of brace depth,
+    so the closing brace and each instance path become phantom commands and the
+    domain's element list is lost entirely. Measured: 505 spurious UPF-001 and
+    138 empty-element domains across the 37-file AnyCore corpus.
+    """
+    from upf_insight.preprocess.upf_preprocess import preprocess
+
+    text = (
+        "upf_version 3.0\n"
+        "create_power_domain PD -elements {\n"
+        "inst0\n"
+        "inst1\n"
+        "}\n"
+    )
+    records = preprocess(text, file="t.upf")
+    commands = [r.text for r in records]
+
+    assert "}" not in commands, "closing brace leaked as its own command"
+    assert "inst0" not in commands, "element path leaked as its own command"
+    assert any("PD" in c and "inst0" in c for c in commands), (
+        f"element list was not kept with its command: {commands}"
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D4) - see REAL_WORLD_REPORT.md Part 2")
+def test_multiline_domain_keeps_its_elements():
+    """The domain must retain its instance list, not parse as empty."""
+    from upf_insight.engine.engine import validate_records
+    from upf_insight.preprocess.upf_preprocess import preprocess
+
+    text = (
+        "upf_version 3.0\n"
+        "create_supply_port VDD -direction in\n"
+        "create_supply_net VDD -resolve port\n"
+        "connect_supply_net VDD -ports VDD\n"
+        "create_supply_port VSS -direction in\n"
+        "create_supply_net VSS -resolve port\n"
+        "connect_supply_net VSS -ports VSS\n"
+        "create_supply_set primary -function {power VDD} -function {ground VSS}\n"
+        "create_power_domain PD -elements {\n"
+        "u_core\n"
+        "u_cache\n"
+        "} -primary_supply_set primary\n"
+    )
+    result = validate_records(preprocess(text, file="t.upf"))
+    dom = result.check.model.domains.get("PD")
+    assert dom is not None and dom.elements, (
+        "multi-line -elements list was lost; element-based checks are blind"
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="known v0.3.0 parser defect (D5) - see REAL_WORLD_REPORT.md Part 2")
+def test_supply_port_pair_is_split():
+    """`-input_supply_port {vin VDD}` is a pair, not one supply named '{vin VDD}'."""
+    from upf_insight.engine.engine import validate_records
+    from upf_insight.preprocess.upf_preprocess import preprocess
+
+    text = (
+        "upf_version 3.0\n"
+        "create_supply_port VDD -direction in\n"
+        "create_supply_net VDD -resolve port\n"
+        "connect_supply_net VDD -ports VDD\n"
+        "create_supply_set primary -function {power VDD}\n"
+        "create_power_switch SW -input_supply_port {vin VDD} \\n"
+        "    -output_supply_port {vout VDD_SW} -control_port en \\n"
+        "    -on_state {ON VDD {en}} -off_state {OFF {!en}}\n"
+        "create_supply_net VDD_SW -resolve net\n"
+        "create_power_domain PD -elements {u_core} -primary_supply_set primary\n"
+    )
+    result = validate_records(preprocess(text, file="t.upf"))
+    messages = " | ".join(f.message for f in result.check.findings)
+    assert "{vin VDD}" not in messages, (
+        "supply-port pair used verbatim as a supply name"
+    )

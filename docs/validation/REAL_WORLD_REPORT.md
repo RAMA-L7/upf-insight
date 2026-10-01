@@ -13,9 +13,16 @@
 rate.** 53 of 95 findings on the validation corpus are tool defects, not
 defects in the designs.
 
+**On production open-source UPF the rate is worse: 65% across 37 files from
+the AnyCore RISC-V processor, and 100% on a 9-command valid file from
+Tenstorrent.** Details in Part 2.
+
 | Metric | Value |
 |---|---|
-| Corpus files | 2 shipped + 1 external run (see note) |
+| Real open-source projects | 2 (AnyCore RISC-V, Tenstorrent AOU) |
+| Real-project findings | 4013 across 38 files |
+| Real-project FP rate | **65%** (AnyCore), **100%** (Tenstorrent) |
+| Shipped corpus | 2 files (1 external run, see note) |
 | Findings | 34 shipped-corpus (95 including the external run) |
 | False positives | **15 of 34 (44%)** shipped corpus; **53 of 95 (56%)** including external |
 | Genuine / needs-review | 19 (56%) |
@@ -46,14 +53,31 @@ about *precision on foreign input*. This corpus measures the second thing.
 
 ## Validation environment
 
-The laptop has **no commercial or open-source EDA tools installed** — no
-Yosys, OpenSTA, OpenROAD, Magic, Icarus, Verilator, Liberty/LEF libraries, or
-Docker. `tcl-magic` (0.0.5) is present as a Python package only.
+> **Correction.** An earlier revision of this report stated that no EDA tools
+> were installed. **That was wrong.** The check had probed only `PATH`. The
+> OSS CAD Suite is installed at `D:/tools/oss-cad-suite/` and 12 of its tools
+> run correctly. See [`EDA_ENVIRONMENT.md`](EDA_ENVIRONMENT.md), regenerable
+> with `python scripts/probe_eda.py --write`.
 
-Consequence: **no tool-to-tool differential testing was possible.** Every
-verdict below rests on the IEEE 1801 grammar, not on agreement with a
-reference implementation. Where the standard admits both spellings, that is
-stated explicitly rather than guessed.
+**Verified runnable** (OSS CAD Suite, `D:/tools/oss-cad-suite/`; both `bin/`
+and `lib/` must be on `PATH` or the binaries fail to load their DLLs):
+
+| Tool | Version |
+|---|---|
+| Yosys | `0.69+154 (git sha1 30d62572e-dirty, Release)` |
+| Icarus Verilog | `14.0 (devel) (s20260301-500-g2e81fcccb-dirty)` |
+| Verilator | `5.053 devel rev v5.052-119-g014c9820d` |
+| nextpnr (ecp5/generic), SymbiYosys 0.69, Z3 4.15.5, Boolector 3.2.4, Yices 2.7.0, cvc5 1.0.1, GTKWave 4.0.0 | present |
+
+**Still genuinely absent:** OpenSTA, OpenROAD, Surelog, UHDM, KLayout, Magic,
+Netgen, OpenLane.
+
+**Consequence.** Yosys, Icarus and Verilator can produce netlists, which means
+the design-aware path (`--netlist`, rules UPF-080…084) *is* testable. What is
+still missing is a **UPF-consuming reference tool** — nothing here reads UPF
+and reports on it, so the D1–D3 verdicts below still rest on the IEEE 1801
+grammar rather than on agreement with a second implementation. Yosys/Icarus
+give an independent opinion on the *Verilog*, not on the *power intent*.
 
 ## Corpus
 
@@ -134,6 +158,114 @@ These are real and useful — the tool is not merely noisy:
 
 This is the signal the tool exists to produce, and it is working.
 
+## Part 2 — Real open-source projects (AnyCore, Tenstorrent)
+
+The small corpus above was written to isolate specific defects. These results
+come from **unmodified UPF taken from production open-source projects**.
+
+### D4 — CRITICAL: multi-line brace groups are split into phantom commands
+
+`preprocess()` splits a command at every newline regardless of brace depth.
+Real UPF writes element lists across lines:
+
+```tcl
+create_power_domain PG_PRF_Active_Free_2 -elements {
+activeList/INST_LOOP[2].ram_inst
+targetAddrActiveList/INST_LOOP[2].ram_inst
+}
+```
+
+This is ordinary Tcl and appears throughout the AnyCore corpus. The parser
+emits **four commands** from it:
+
+```
+L5: 'create_power_domain PG_PRF_Active_Free_2 -elements {'
+L6: 'activeList/INST_LOOP[2].ram_inst'
+L7: 'targetAddrActiveList/INST_LOOP[2].ram_inst'
+L8: '}'
+```
+
+Consequences, all confirmed by execution:
+
+- `}` and every instance path are reported as **unknown UPF commands**
+  (505 spurious `UPF-001` across the corpus)
+- The domain's `elements` list comes out **empty** — the tool cannot see any
+  design hierarchy
+- **138 domains across 26 of the 37 files have zero elements**
+- `create_power_domain -include_scope TOP` (no name) yields a **phantom domain
+  literally named `-include_scope`** (11 occurrences)
+
+This is the highest-impact defect found. It is also why the codebase comment at
+`upf_preprocess.py:43` describes the behaviour as *deliberate* — a considered
+choice to survive an unbalanced brace. The trade-off is wrong for real input:
+an unbalanced brace is rarer than a multi-line element list.
+
+### D5 — Supply-port pairs treated as single supply names
+
+`-input_supply_port {vin VDD}` is a `{name value}` pair. The engine stores the
+whole token, so `UPF-010` reports:
+
+```
+Supply '{vin VDD}' is referenced but never defined as a net, port or set.
+```
+
+238 such findings. The name is `vin`; the value is `VDD`.
+
+### D6 — Cascade from an empty model
+
+`UPF-025` (unused supply state) fires 177 times because D4 emptied the model:
+supply states exist but nothing references them, *because the references were
+discarded*. Correct logic, meaningless input.
+
+### Results
+
+| Project | Files | Findings | False positives | FP rate |
+|---|---|---|---|---|
+| **AnyCore RISC-V** (`anycore/anycore-riscv-src`, `power_spec/*.upf`) | 37 | 4012 | **2619** | **65%** |
+| **Tenstorrent AOU** (`tt-oca-harness-aou`, Apache-2.0) | 1 | 1 | **1** | **100%** |
+
+The Tenstorrent file is 9 commands: one always-on domain, two supply nets, two
+ports, two connections. It is entirely valid UPF 2.1. UPF-Insight reports one
+error — `-include_scope` is illegal — and returns **`BLOCKED`**.
+
+**A 9-command valid file is BLOCKED.** That is the clearest possible statement
+of the current state.
+
+### AnyCore breakdown
+
+| Bucket | Count |
+|---|---|
+| Genuine / needs review | 1252 |
+| FP: legal option rejected (D1) | 994 |
+| FP: multi-line brace split (D4) | 505 |
+| FP: cascade from switch parse (D1) | 476 |
+| FP: supply pair not split (D5) | 238 |
+| FP: brace group not split (D3) | 229 |
+| FP: cascade from empty model (D6) | 177 |
+| Review: scope needs netlist | 141 |
+
+### Design-aware validation against a real netlist
+
+Yosys 0.69+154 synthesized a two-domain design (`u_aon` always-on, `u_core`
+switchable, crossing `core_data_out`). The resulting netlist was converted to a
+design context — 5 instances, 3 sequential, 8 signals — and passed via
+`--netlist`.
+
+The design-aware layer works. `UPF-081` correctly reported:
+
+```
+Retention signal '{iso_en high}' for domain 'PD_CORE' is not in the design.
+```
+
+**The finding is real, and the tool's own message reveals a defect**: `iso_en`
+*is* in the design; the token `{iso_en high}` was never split into its bare
+signal name before lookup. UPF-081 is simultaneously detecting a genuine class
+of problem and being tripped up by it.
+
+This is the strongest evidence that the design-aware path is worth finishing:
+with a netlist attached, the tool finds real issues — and immediately exposes
+its own gaps precisely.
+
 ## Honest assessment
 
 **What works.** The semantic layer is genuinely valuable. Isolation
@@ -153,15 +285,29 @@ calibration, which was not tested because no reference tool exists here.
 
 ## Required improvements, in priority order
 
-**P0 — grammar coverage.** Accept the 9 legal options and model them. This is
-the single highest-leverage change: it removes 38 of 53 false positives and
-un-breaks switch modeling, which also clears the D1 cascade.
+**P0 — multi-line brace groups (D4). Highest impact of everything found.**
+Track brace/bracket depth across newlines in `preprocess()` and only split a
+command at depth 0. This one change removes 505 spurious `UPF-001`, restores
+element lists for 138 domains the tool currently sees as empty, and stops the
+phantom `-include_scope` domain. Until it lands, every element-based check is
+running on an empty model.
+
+**P0 — grammar coverage (D1).** Accept the 9 legal options and model them:
+994 false positives, and it un-breaks switch modeling, which also clears the
+D1/D5 cascade.
 
 **P0 — brace-group expansion.** Split `{ a b c }` into members for
 `-ports`/`-nets`/`-elements`. Tcl requires it; real files use it constantly.
 
 **P1 — `map_power_switch`.** Add to `_SUPPORTED` with the same shape as the
 existing `map_*_cell` handlers.
+
+**P0 — supply-port pairs (D5).** Split `{vin VDD}` into name and value before
+use as a supply reference. 238 false positives.
+
+**P1 — `UPF-081` bare-signal lookup.** Split `{sig polarity}` before checking
+`design.has_signal()`. Demonstrated against a real netlist: `iso_en` exists
+but `{iso_en high}` does not, so a valid design is flagged.
 
 **P1 — `UPF-002` severity.** An option the engine has not implemented is
 `UNSUPPORTED` support, not `VALIDATED`. Tagging a known-unimplemented option
