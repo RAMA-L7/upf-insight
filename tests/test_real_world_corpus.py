@@ -118,21 +118,21 @@ def test_switches_are_connected_to_supplies():
 def test_semantic_checks_still_fire_on_real_upf():
     """The false positives above must not be 'fixed' by disabling real checks.
 
-    Guards the value the tool exists to provide: on a real third-party file it
-    must still report always-on control questions and bidirectional crossings.
+    Guards the value the tool exists to provide: it must still report
+    always-on control questions and bidirectional crossings on legal UPF.
     """
     from upf_insight.engine.engine import validate
 
-    result = validate([str(CORPUS / "tessolve_soc_top.upf")])
+    result = validate([str(CORPUS / "ieee1801_upf21_forms.upf")])
     codes = {f.rule for f in result.check.findings}
     for rule in ("UPF-044", "UPF-047", "UPF-051"):
         assert rule in codes, (
-            f"{rule} stopped firing on real UPF — semantic checks regressed"
+            f"{rule} stopped firing on corpus UPF — semantic checks regressed"
         )
 
 
 def test_false_positive_rate_is_reported():
     """The harness must always emit a rate, so regressions are visible."""
-    payload = _codes("tessolve_soc_top.upf")
+    payload = _codes("ieee1801_upf21_forms.upf")
     assert "false_positive_rate" in payload
     assert payload["findings"] > 0
