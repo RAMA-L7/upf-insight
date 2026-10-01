@@ -474,10 +474,17 @@ def _domain_primary_power(model: PowerIntentModel, dom) -> Optional[str]:
     return None
 
 
-def _domain_by_name(model: PowerIntentModel, name: str):
+def _domain_by_name(model: PowerIntentModel, name: str, scope: str | None = None):
+    """Resolve a bare domain name declared in ``scope``.
+
+    Strategies store the bare ``-domain`` string but are themselves built in a
+    known scope, so resolution must use that scope rather than the model's
+    final cursor — otherwise the same input yields different findings
+    depending on the order the files were listed.
+    """
     if not name:
         return None
-    key = model.scope_key(name, model.current_scope)
+    key = model.scope_key(name, scope if scope is not None else model.current_scope)
     return model.domains.get(key) or model.domains.get(name)
 
 
@@ -562,7 +569,7 @@ def _isolation_self_in_switchable(model: PowerIntentModel):
     for iso in model.isolation:
         if iso.location != "self":
             continue
-        dom = _domain_by_name(model, iso.domain)
+        dom = _domain_by_name(model, iso.domain, iso.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -607,7 +614,7 @@ def _redundant_isolation(model: PowerIntentModel):
     findings = []
     switched = _switchable_outputs(model)
     for iso in model.isolation:
-        dom = _domain_by_name(model, iso.domain)
+        dom = _domain_by_name(model, iso.domain, iso.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -965,7 +972,7 @@ def _wrong_level_shifter_rule(model: PowerIntentModel):
     voltages: Dict[str, Optional[float]] = {
         dom.name: _domain_voltage(model, dom) for dom in model.domains.values()}
     for ls in model.level_shifters:
-        dom = _domain_by_name(model, ls.domain)
+        dom = _domain_by_name(model, ls.domain, ls.scope)
         if dom is None:
             continue
         v = voltages.get(dom.name)
@@ -998,7 +1005,7 @@ def _ls_self_in_switchable(model: PowerIntentModel):
     for ls in model.level_shifters:
         if ls.location != "self":
             continue
-        dom = _domain_by_name(model, ls.domain)
+        dom = _domain_by_name(model, ls.domain, ls.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -1182,7 +1189,7 @@ def _retention_without_supply(model: PowerIntentModel):
     for ret in model.retentions:
         if ret.retention_supply:
             continue
-        dom = _domain_by_name(model, ret.domain)
+        dom = _domain_by_name(model, ret.domain, ret.scope)
         primary = _domain_primary_power(model, dom) if dom else None
         if primary and primary in switched:
             findings.append(Finding(
@@ -1665,7 +1672,7 @@ def _repeater_self_in_switchable(model: PowerIntentModel):
     for rep in model.repeaters:
         if rep.location != "self":
             continue
-        dom = _domain_by_name(model, rep.domain)
+        dom = _domain_by_name(model, rep.domain, getattr(rep, "scope", None))
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)

@@ -8,6 +8,7 @@ support boundary can report exactly what was not modeled.
 
 from __future__ import annotations
 
+import os
 from typing import List, Optional
 
 from ..preprocess.upf_preprocess import CommandRecord
@@ -197,17 +198,29 @@ def _tokenize(record: CommandRecord) -> List[str]:
 
 
 def build_model(records: List[CommandRecord]) -> PowerIntentModel:
-    """Build a power-intent model from preprocessed command records."""
+    """Build a power-intent model from preprocessed command records.
+
+    Scope is per-file state. A file that never issues ``set_scope`` starts at
+    the top scope rather than inheriting the previous file's cursor, and a
+    file pulled in by ``load_upf <f> -scope <s>`` starts in ``<s>`` — IEEE 1801
+    lets a child inherit the scope it is loaded into instead of repeating
+    ``set_scope``. Without this, the model depended on the order files were
+    listed on the command line.
+    """
     model = PowerIntentModel()
+    # child-file basename -> scope established by a prior `load_upf -scope`.
+    file_scope: dict = {}
+    last_file: Optional[str] = None
     for rec in records:
+        if rec.file != last_file:
+            model.current_scope = file_scope.get(os.path.basename(rec.file or ""), ".")
+            last_file = rec.file
         model.commands_seen += 1
         files = model.record_files.setdefault(rec.line, [])
         if rec.file not in files:
             files.append(rec.file)
         if rec.file:
-            import os as _os
-
-            model.record_file_names.add(_os.path.basename(rec.file))
+            model.record_file_names.add(os.path.basename(rec.file))
         try:
             tokens = _tokenize(rec)
         except Exception:
@@ -220,7 +233,13 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
             model.unsupported_commands.append(f"{cmd} ({rec.file}:{rec.line})")
             continue
         _syntax_check(model, cmd, tokens, rec)
+        seen_loads = len(model.load_upf_events)
         _dispatch(model, cmd, args, rec)
+        # `load_upf` scopes the child: record basename -> child scope so the
+        # boundary above enters that file in the right scope.
+        for ev in model.load_upf_events[seen_loads:]:
+            if ev.get("loaded"):
+                file_scope[os.path.basename(ev["loaded"])] = ev.get("child_scope") or "."
     _apply_control_bindings(model)
     return model
 

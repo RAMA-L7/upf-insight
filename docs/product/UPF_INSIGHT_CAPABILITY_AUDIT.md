@@ -1,5 +1,12 @@
 # UPF-Insight — Capability Audit (vs Ṛta engineering standard)
 
+> ⚠️ **Historical snapshot (v0.1.0, 2026-08-16).** The counts below — 94 tests,
+> 65 rules, the 76→94 comparison against Ṛta — were true when this audit ran
+> and are deliberately left unedited so the record stays honest. Current
+> figures are **v0.3.0 · 77 rules · 295 tests**. The relative ordering
+> (UPF-Insight younger and narrower than Ṛta) still holds; the absolute
+> numbers have moved. Re-audit before relying on any specific figure.
+
 > **Document kind:** audit · **Date:** 2026-08-16 · **Status:** verified
 > against the live repository (engine, CLI, API, web UI, tests, fixtures,
 > docs). Every PASS below is backed by an executed check in this audit, not

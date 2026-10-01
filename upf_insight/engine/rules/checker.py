@@ -80,12 +80,15 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
         try:
             findings = handler(model)
         except Exception as exc:  # a rule must never crash the whole run
+            # NOT_VALIDATED, not VALIDATED: a rule that crashed proved
+            # nothing about the design. Tagging it VALIDATED would let an
+            # engine bug read as a clean bill of health.
             findings = [
                 Finding(
                     rule=rule.code,
                     severity="error",
                     message=f"internal rule error: {exc}",
-                    support="VALIDATED",
+                    support="NOT_VALIDATED",
                 )
             ]
         for f in findings:
@@ -95,6 +98,12 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
     _apply_cascade_suppression(result)
     _enforce_evidence_boundary(result)
     _resolve_finding_files(model, result.findings)
+    # The field is serialized in to_dict(); populate it rather than leaving
+    # every consumer an empty dict. Lazy import keeps the rule layer free of
+    # a module-level dependency on the trust package.
+    from ..trust.support_boundary import compute_support_boundary
+
+    result.support_boundary = dict(compute_support_boundary(model).statuses)
     return result
 
 
