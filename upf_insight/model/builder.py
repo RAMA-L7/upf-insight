@@ -650,7 +650,8 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         name = args[0] if args else "?"
         _track_definition(model, "pst", name, line)
         model.psts[model.scope_key(name, model.current_scope)] = Pst(
-            name=name, scope=model.current_scope, declared_line=line
+            name=name, scope=model.current_scope, declared_line=line,
+            supply_list=_split_opt(args, "-supplies"),
         )
         last_pst_name = name
     elif cmd == "add_pst_state":
@@ -666,12 +667,42 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             from .power_model import PowerState
 
             supply_states: dict = {}
+            # IEEE 1801 defines two accepted spellings for -state:
+            #
+            #   positional (real files, AnyCore):
+            #       create_pst P -supplies { VDD VSS sw/vout }
+            #       add_pst_state ON -pst P -state {ACTIVE ACTIVE OFF }
+            #     -> entries map *by position* onto the -supplies list.
+            #
+            #   explicit pairs (also legal, used by this project's fixtures):
+            #       add_pst_state ON -pst P -state {vdd ACTIVE vss ACTIVE}
+            #     -> each entry names its supply.
+            #
+            # Reading the positional form as (name, value) pairs put a state
+            # name in the supply slot, which made every state look
+            # unreferenced (UPF-025/030) and produced self-referential findings
+            # like "state 'ACTIVE' on supply 'ACTIVE'" (UPF-031).
+            raw_states = []
             for i, a in enumerate(args):
                 if a == "-state" and i + 1 < len(args):
-                    tokens = _split_pair(args[i + 1])
-                    # -state {vdd ON vss ON} → consecutive (supply, state) pairs
-                    for j in range(0, len(tokens) - 1, 2):
-                        supply_states[tokens[j]] = tokens[j + 1]
+                    raw_states.extend(_split_pair(args[i + 1]))
+
+            pst_supplies = _split_opt(args, "-supplies") or \
+                list(pst.supply_list)
+
+            if len(raw_states) == 2 * len(pst_supplies) and pst_supplies:
+                # Even count with no supply names given => explicit pairs.
+                for j in range(0, len(raw_states) - 1, 2):
+                    supply_states[raw_states[j]] = raw_states[j + 1]
+            elif pst_supplies and len(raw_states) == len(pst_supplies):
+                # Positional: one state per supply, in -supplies order.
+                for supply, st in zip(pst_supplies, raw_states):
+                    supply_states[supply] = st
+            else:
+                # No usable -supplies list (e.g. a bare fixture): fall back to
+                # the historical pairwise reading rather than inventing a key.
+                for j in range(0, len(raw_states) - 1, 2):
+                    supply_states[raw_states[j]] = raw_states[j + 1]
             pst.states.append(PowerState(
                 name=state_name, supply_states=supply_states, declared_line=line
             ))

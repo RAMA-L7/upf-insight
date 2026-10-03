@@ -112,6 +112,11 @@ class Pst:
     states: List[PowerState] = field(default_factory=list)
     transitions: List[tuple] = field(default_factory=list)  # (src, dst)
     declared_line: Optional[int] = None
+    #: Supply names from ``create_pst -supplies``, in declaration order.
+    #: IEEE 1801 maps ``add_pst_state -state`` entries *positionally* onto this
+    #: list, so it must be retained — without it the positional form is
+    #: unresolvable and every state reads as unreferenced.
+    supply_list: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -120,6 +125,7 @@ class Pst:
             "states": [s.to_dict() for s in self.states],
             "transitions": [list(t) for t in self.transitions],
             "declared_line": self.declared_line,
+            "supply_list": list(self.supply_list),
         }
 
 
