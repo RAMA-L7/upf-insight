@@ -424,20 +424,42 @@ def _unsolated_power_down_crossing(model: PowerIntentModel):
 def _switchable_net_not_modeled(model: PowerIntentModel):
     """Tri-state/floating: a switchable domain's power net is absent from the PST."""
     findings = []
+    # switch name -> the switch producing `net`, so the finding can cite the
+    # relationship it checked rather than only its conclusion.
+    producer = {sw.output_supply: sw for sw in model.switches.values()
+                if sw.output_supply}
+    referenced = {supply
+                  for pst in model.psts.values()
+                  for state in pst.states
+                  for supply in state.supply_states}
     for ev in analyze_cross_state(model):
         if ev["type"] != "unmodeled_switch":
             continue
+        net = ev["net"]
+        sw = producer.get(net)
+        evidence = [f"Domain: {ev['domain']}",
+                    f"Primary supply: {net}"]
+        if sw is not None:
+            role = sw.output_port_role or "vout"
+            evidence += [
+                f"Power switch: {sw.name}",
+                f"Input supply: {sw.input_supply}",
+                f"Output supply: {net} (as {sw.name}/{role})",
+            ]
+        evidence.append(f"PST checked: {ev.get('pst', '(none)')}")
+        evidence.append("PST supplies referencing it: none")
         findings.append(Finding(
             rule="UPF-038", severity="warning",
             message=(
                 f"Switchable domain '{ev['domain']}' primary supply "
-                f"'{ev['net']}' (a power-switch output) is never modeled by any "
+                f"'{net}' (a power-switch output) is never modeled by any "
                 f"PST state; its tri-state/floating power behavior cannot be "
                 f"verified."
             ),
             line=ev.get("line"),
             file=ev.get("file") or "",
             subject=ev.get("subject") or ev["domain"],
+            evidence=evidence,
             support="NETLIST_REQUIRED"))
     return findings
 
