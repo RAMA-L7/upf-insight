@@ -270,6 +270,90 @@ false positive on every hierarchically loaded block. A child *restating* its own
 scope (`set_scope core_a` in `core_a.upf`) remains idempotent, which the
 generator depends on.
 
+## Part 1c — Semantic adjudication (grammar clean ≠ findings correct)
+
+The grammar layer being clean establishes only that the engine no longer
+*invents syntax findings*. It says nothing about whether the surviving
+semantic findings are right. `scripts/adjudicate.py` builds a per-finding
+dataset (rule, severity, file, line, verbatim source construct, normalized
+form, scope, referenced domains/supplies/design objects, registry metadata),
+clusters findings by rule / message shape / source command / argument pattern,
+and records a verdict per rule. It observes only — no rule was changed to move
+a number.
+
+**Classification:** TRUE_POSITIVE · VALID_ADVISORY · FALSE_POSITIVE ·
+UNSUPPORTED_CONSTRUCT · IMPLEMENTATION_DEFECT · DUPLICATE_OR_CASCADE ·
+UNRESOLVED. A rule with no adjudicated verdict is UNRESOLVED by construction.
+
+### Two defects confirmed, both invisible from the project's own fixtures
+
+Both had the same shape: the engine was **internally consistent**, its own
+fixtures agreed with it, and its mutation corpus passed. Only UPF written by
+somebody else exposed them.
+
+**UPF-087 — bus bit-selects treated as wildcards (309 findings, all wrong).**
+`WILDCARD_CHARS` includes `[`, so every Verilog array reference scored as a
+glob. All 309 AnyCore findings were bit-selects (`INST_LOOP[0].ram_instance`,
+`alPartitionActive_i[2]`, `SW_x/vout`); **zero** contained a real `*`, `?`, or
+character class. In IEEE 1801 an element list names design objects and
+`inst[3]` selects exactly one array element — no pattern semantics. The
+project's own netlist parser already expands `data_in[0]` into literal signals,
+so the rule contradicted the rest of the codebase. No test covered a
+bit-select. Now only a non-numeric bracket group (`[abc]`, `[a-z]`) is a glob.
+
+**`add_pst_state` — positional `-state` read as (supply, state) pairs.**
+IEEE 1801 maps `-state` entries **positionally** onto `create_pst -supplies`.
+AnyCore writes:
+
+```tcl
+create_pst Core_OOO_PST -supplies { VDD VSS sw2/vout sw3/vout }
+add_pst_state ALL_OFF -pst Core_OOO_PST -state {ACTIVE ACTIVE OFF OFF}
+```
+
+The builder read those four entries as consecutive pairs, putting a *state
+name* in the *supply* slot, and `Pst` did not retain the `-supplies` list at
+all, so positional mapping was not possible. UPF-031 reported the result
+verbatim: *"state 'ACTIVE' on supply 'ACTIVE'"* — an expression no valid UPF
+can produce. Both legal spellings (positional and explicit `supply state`
+pairs) now resolve.
+
+Cascade removed: UPF-031 48→0, UPF-025 177→52, UPF-030 177→63, UPF-034 16→2.
+
+### Adjudicated but deliberately not fixed
+
+| Rule | Count | Verdict | Why |
+|---|---|---|---|
+| UPF-013 | 238 | DUPLICATE_OR_CASCADE | All 238 share subject `TOP` from 4 files. The corpus re-enters shared files into child scopes (`load_upf BTB.upf` under `/fs1`, `/btb`, …), which legitimately redefines names in a different scope. The duplicate detector does not scope-qualify, so one root floods 238 findings — 216 with **no file attribution at all**. Not 238 independent defects. |
+| UPF-038 | 220 | UNRESOLVED | Its verdict depends on PST analysis, which consumed the corrupted `supply_states` map. Held unresolved rather than guessed; re-adjudicate now that the mapping is fixed. |
+
+### Effect on the measured numbers
+
+| | Before adjudication | After |
+|---|---|---|
+| AnyCore load-set findings | 2296 | **1651** |
+| UPF-087 | 309 | **0** |
+| UPF-031 | 48 | **0** |
+| Grammar-layer FP count | 32 | 32 (unchanged) |
+| Grammar-layer FP *rate* | 1.4% | 1.9% |
+
+The rate moved up only because the denominator shrank; the absolute count of
+grammar-layer false positives is unchanged. This is also why no single
+"accuracy" figure is quoted — see the confidence limitations below.
+
+### A measurement caveat: load order is semantically significant
+
+The same corpus validated as one load set yields **1651 or 1686 findings**
+depending on how the file list was enumerated. `sorted()` on paths and
+`Path.glob` disagree on collation (`RamPartitioned_FreePDK.upf` sorts before
+`RamPartitionedAL.upf` under `Path.glob`, after it under `sorted()`), and
+because `set_scope` / `load_upf` are positional, order legitimately changes the
+model — UPF-038 (185 vs 220) and UPF-041 (61 vs 68) are the rules that move.
+
+Both orders are individually deterministic and repeatable. They simply measure
+different load orders. **When quoting a load-set figure, state the enumeration
+method.** `scripts/validate_external.py` and `scripts/adjudicate.py` currently
+differ here; they should agree on one canonical order.
+
 ## Part 2 — Real open-source projects (AnyCore, Tenstorrent)
 
 The small corpus above was written to isolate specific defects. These results
