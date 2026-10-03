@@ -63,6 +63,16 @@ class PowerSwitch:
     input_supply: Optional[str] = None
     output_supply: Optional[str] = None
     control_port: Optional[str] = None
+    #: Role half of a ``-control_port {role signal}`` pair (e.g. ``ctrl``).
+    #: Retained because on/off-state conditions may legitimately reference the
+    #: role rather than the signal: ``-on_state {on_s vin {ctrl}}``.
+    control_port_role: Optional[str] = None
+    #: Role halves of the supply-port pairs, e.g. ``{vout VDD_SW}`` yields
+    #: ``("vout", "vin")``. IEEE 1801 lets ``create_pst -supplies`` name a
+    #: switched supply by its *port path* (``SW/vout``) as well as by its net
+    #: name, so the role is needed to recognise a supply the PST does model.
+    output_port_role: Optional[str] = None
+    input_port_role: Optional[str] = None
     on_state: Optional[str] = None      # on-state name (from -on_state triple)
     off_state: Optional[str] = None     # off-state name (from -off_state triple)
     on_state_supply: Optional[str] = None       # supply port in the on-state triple
@@ -108,6 +118,11 @@ class Pst:
     states: List[PowerState] = field(default_factory=list)
     transitions: List[tuple] = field(default_factory=list)  # (src, dst)
     declared_line: Optional[int] = None
+    #: Supply names from ``create_pst -supplies``, in declaration order.
+    #: IEEE 1801 maps ``add_pst_state -state`` entries *positionally* onto this
+    #: list, so it must be retained — without it the positional form is
+    #: unresolvable and every state reads as unreferenced.
+    supply_list: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -116,6 +131,7 @@ class Pst:
             "states": [s.to_dict() for s in self.states],
             "transitions": [list(t) for t in self.transitions],
             "declared_line": self.declared_line,
+            "supply_list": list(self.supply_list),
         }
 
 
@@ -156,6 +172,15 @@ class RetentionStrategy:
     retention_supply: Optional[str] = None
     save_signal: Optional[str] = None
     restore_signal: Optional[str] = None
+    #: Signal halves of ``-save_signal {sig sense}`` / ``-restore_signal``, with
+    #: the polarity split off. ``save_signal`` keeps the raw token for
+    #: provenance; these carry the bare signal so design-aware rules can
+    #: resolve it against real design objects instead of comparing against the
+    #: literal string ``'{save high}'``.
+    save_signal_name: Optional[str] = None
+    save_signal_sense: Optional[str] = None
+    restore_signal_name: Optional[str] = None
+    restore_signal_sense: Optional[str] = None
     control_signal: Optional[str] = None  # from set_retention_control -retention_signal
     declared_line: Optional[int] = None
     declared_file: Optional[str] = None
@@ -222,6 +247,11 @@ class PowerIntentModel:
     #: Built from the authoritative CommandRecord stream so findings can carry
     #: file provenance without each model object retaining it.
     record_files: Dict[int, List[str]] = field(default_factory=dict)
+    #: Every command record keyed by ``"<file>::<line>"`` -> verbatim text.
+    #: Line numbers repeat across files, so a global line index cannot say
+    #: *which* file a finding came from. This map can, and is what finding
+    #: provenance is resolved from (see ``resolve_provenance``).
+    record_texts: Dict[str, str] = field(default_factory=dict)
     #: basenames of every validated input file (for load_upf resolution)
     record_file_names: set = field(default_factory=set)
     unsupported_commands: List[str] = field(default_factory=list)

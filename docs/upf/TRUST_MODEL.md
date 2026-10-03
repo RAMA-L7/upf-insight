@@ -47,12 +47,14 @@ Layers 1–5 of the rule catalog, fully static:
 5. **Strategy lint** — isolation control, retention supply/elements,
    level-shifter advisories, always-on correctness at the static level.
 
-## 4. What v1 does NOT validate
+## 4. What the engine does NOT validate
 
 - **Design awareness** (UPF-080…084): instance existence, control-signal
   existence, endpoint-based crossing coverage, retention coverage vs actual
-  flip-flops, library PG mapping. These require a netlist/RTL context and are
-  planned for v2. The boundary is always disclosed (`NETLIST_REQUIRED`).
+  flip-flops, library PG mapping. These **ship** since v0.3.0 but require a
+  netlist/RTL context — supply one with `upf-insight check --netlist
+  design.json` or the web API's `design` payload. Without it the boundary is
+  disclosed (`NETLIST_REQUIRED`) and the rules stay silent.
 - **Tcl execution**: any construct that requires running Tcl to resolve is
   never executed — it is detected and surfaced as
   `TCL_EXECUTION_REQUIRED` / `UNSUPPORTED`.
@@ -87,9 +89,9 @@ Analysis runs entirely on the local machine. The workspace is a stdlib-only
 HTTP server bound to `127.0.0.1`. Nothing is uploaded; no analytics are
 collected.
 
-## 8. Readiness vocabulary (planned)
+## 8. Readiness vocabulary
 
-Readiness verdicts (v2, mirroring the sdc-tools model):
+Readiness verdicts (shipped since v0.2.0, mirroring the sdc-tools model):
 
 `READY` · `READY_WITH_ADVISORIES` · `REVIEW_REQUIRED` · `BLOCKED` ·
 `INSUFFICIENT_CONTEXT`

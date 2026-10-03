@@ -1,0 +1,9 @@
+# A relative set_scope composes onto the scope in effect.
+# AnyCore Core_OOO_Hier.upf: set_scope /fs1; load_upf BPU.upf; then in the
+# child `set_scope btb` must land in /fs1/btb, not /btu.
+upf_version 2.1
+create_supply_net VDD
+set_scope /fs1
+set_scope btb
+create_supply_net VDD
+create_supply_port VDD -direction in

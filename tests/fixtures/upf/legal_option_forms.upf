@@ -1,0 +1,14 @@
+# Legal IEEE 1801 option spellings the v0.3.0 grammar rejected.
+# AnyCore Core_OOO_Flat.upf, BPU.upf, ActiveList.upf. Defects D10-D12.
+upf_version 2.1
+set_design_top top
+create_supply_net VDD -domain TOP
+create_supply_net VSS -domain TOP -reuse
+create_power_domain PD0 -elements {u0} -scope u0
+set_isolation ISO0 -domain PD0 -isolation_power_net VDD \
+    -isolation_ground_net VSS -diff_supply_only TRUE
+set_retention RET0 -domain PD0 -retention_power_net VDD \
+    -retention_ground_net VSS
+set_isolation_control ISO0 -domain PD0 -isolation_signal iso_en \
+    -location parent
+map_power_switch SW0 my_lib/power_switch_cell

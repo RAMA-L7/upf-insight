@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from .rules.checker import CheckResult, check_model
+from .stages import stage_report
 from .trust.support_boundary import SupportReport, compute_support_boundary
 from .pst.analyzer import PstAnalysis, analyze_pst
 from .readiness.readiness import ReadinessResult, compute_readiness
@@ -58,6 +59,7 @@ class ValidateResult:
             "wildcards": self.wildcards.to_dict() if self.wildcards else None,
             "design_coverage": (self.design_coverage.to_dict()
                                 if self.design_coverage else None),
+            "stages": stage_report(self.check.findings) if self.check else None,
             "model": model,
             "file_count": self.file_count,
             "command_count": self.command_count,

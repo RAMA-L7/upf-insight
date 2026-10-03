@@ -25,6 +25,9 @@ from typing import Dict, List, Set, Tuple
 
 from ...model.power_model import PowerIntentModel
 
+#: Characters that can introduce pattern semantics. '[' is listed because a
+#: *character class* (`[abc]`) is a glob, but see `_has_wildcard`: a numeric
+#: index inside brackets is a Verilog bit select, not a pattern.
 WILDCARD_CHARS = ("*", "?", "[")
 
 RISK_LOW = "LOW"
@@ -33,7 +36,7 @@ RISK_HIGH = "HIGH"
 
 ELABORATION_NOTE = "wildcards_match_at_elaboration_time_results_may_vary"
 
-_BRACKET_GROUP = re.compile(r"\[[^\]]*\]")
+_BRACKET_GROUPS = re.compile(r"\[[^\]]*\]")
 
 
 @dataclass
@@ -75,12 +78,29 @@ class WildcardResult:
 
 
 def _has_wildcard(pattern: str) -> bool:
-    return any(c in pattern for c in WILDCARD_CHARS)
+    """True when the pattern is a real *pattern*, not a bus bit-select.
+
+    An IEEE 1801 element list names design objects, and Verilog array
+    references are written ``inst[3]``. That bracket is a **bit select that
+    resolves to exactly one object** — it carries no pattern semantics, and the
+    project's own netlist parser expands ``data_in[0]`` into a literal signal
+    rather than a pattern.
+
+    Only a bracket group with non-numeric content (``[abc]``, ``[a-z]``) is a
+    glob character class. Treating every ``[`` as a wildcard made UPF-087 fire
+    on every bus bit in a design — 309 of 309 findings on the AnyCore corpus,
+    none of them wildcards.
+    """
+    if "*" in pattern or "?" in pattern:
+        return True
+    # findall returns the brackets too, so strip them before testing digits.
+    return any(not g.strip("[]").strip().isdigit()
+               for g in _BRACKET_GROUPS.findall(pattern))
 
 
 def _pattern_stats(pattern: str) -> Tuple[int, int, int, bool]:
-    groups = len(_BRACKET_GROUP.findall(pattern))
-    stripped = _BRACKET_GROUP.sub("", pattern)
+    groups = len(_BRACKET_GROUPS.findall(pattern))
+    stripped = _BRACKET_GROUPS.sub("", pattern)
     stars = stripped.count("*")
     questions = stripped.count("?")
     leading = bool(pattern) and pattern[0] in ("*", "?")
@@ -94,7 +114,7 @@ def score_pattern(pattern: str) -> Tuple[float, int, str]:
 
     stars, questions, groups, leading = _pattern_stats(pattern)
     literal_chars = len(
-        _BRACKET_GROUP.sub(
+        _BRACKET_GROUPS.sub(
             "", pattern.replace("*", "").replace("?", "")
         ).strip()
     )

@@ -424,17 +424,42 @@ def _unsolated_power_down_crossing(model: PowerIntentModel):
 def _switchable_net_not_modeled(model: PowerIntentModel):
     """Tri-state/floating: a switchable domain's power net is absent from the PST."""
     findings = []
+    # switch name -> the switch producing `net`, so the finding can cite the
+    # relationship it checked rather than only its conclusion.
+    producer = {sw.output_supply: sw for sw in model.switches.values()
+                if sw.output_supply}
+    referenced = {supply
+                  for pst in model.psts.values()
+                  for state in pst.states
+                  for supply in state.supply_states}
     for ev in analyze_cross_state(model):
         if ev["type"] != "unmodeled_switch":
             continue
+        net = ev["net"]
+        sw = producer.get(net)
+        evidence = [f"Domain: {ev['domain']}",
+                    f"Primary supply: {net}"]
+        if sw is not None:
+            role = sw.output_port_role or "vout"
+            evidence += [
+                f"Power switch: {sw.name}",
+                f"Input supply: {sw.input_supply}",
+                f"Output supply: {net} (as {sw.name}/{role})",
+            ]
+        evidence.append(f"PST checked: {ev.get('pst', '(none)')}")
+        evidence.append("PST supplies referencing it: none")
         findings.append(Finding(
             rule="UPF-038", severity="warning",
             message=(
                 f"Switchable domain '{ev['domain']}' primary supply "
-                f"'{ev['net']}' (a power-switch output) is never modeled by any "
+                f"'{net}' (a power-switch output) is never modeled by any "
                 f"PST state; its tri-state/floating power behavior cannot be "
                 f"verified."
             ),
+            line=ev.get("line"),
+            file=ev.get("file") or "",
+            subject=ev.get("subject") or ev["domain"],
+            evidence=evidence,
             support="NETLIST_REQUIRED"))
     return findings
 
@@ -474,10 +499,17 @@ def _domain_primary_power(model: PowerIntentModel, dom) -> Optional[str]:
     return None
 
 
-def _domain_by_name(model: PowerIntentModel, name: str):
+def _domain_by_name(model: PowerIntentModel, name: str, scope: str | None = None):
+    """Resolve a bare domain name declared in ``scope``.
+
+    Strategies store the bare ``-domain`` string but are themselves built in a
+    known scope, so resolution must use that scope rather than the model's
+    final cursor — otherwise the same input yields different findings
+    depending on the order the files were listed.
+    """
     if not name:
         return None
-    key = model.scope_key(name, model.current_scope)
+    key = model.scope_key(name, scope if scope is not None else model.current_scope)
     return model.domains.get(key) or model.domains.get(name)
 
 
@@ -562,7 +594,7 @@ def _isolation_self_in_switchable(model: PowerIntentModel):
     for iso in model.isolation:
         if iso.location != "self":
             continue
-        dom = _domain_by_name(model, iso.domain)
+        dom = _domain_by_name(model, iso.domain, iso.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -607,7 +639,7 @@ def _redundant_isolation(model: PowerIntentModel):
     findings = []
     switched = _switchable_outputs(model)
     for iso in model.isolation:
-        dom = _domain_by_name(model, iso.domain)
+        dom = _domain_by_name(model, iso.domain, iso.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -965,7 +997,7 @@ def _wrong_level_shifter_rule(model: PowerIntentModel):
     voltages: Dict[str, Optional[float]] = {
         dom.name: _domain_voltage(model, dom) for dom in model.domains.values()}
     for ls in model.level_shifters:
-        dom = _domain_by_name(model, ls.domain)
+        dom = _domain_by_name(model, ls.domain, ls.scope)
         if dom is None:
             continue
         v = voltages.get(dom.name)
@@ -998,7 +1030,7 @@ def _ls_self_in_switchable(model: PowerIntentModel):
     for ls in model.level_shifters:
         if ls.location != "self":
             continue
-        dom = _domain_by_name(model, ls.domain)
+        dom = _domain_by_name(model, ls.domain, ls.scope)
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)
@@ -1182,7 +1214,7 @@ def _retention_without_supply(model: PowerIntentModel):
     for ret in model.retentions:
         if ret.retention_supply:
             continue
-        dom = _domain_by_name(model, ret.domain)
+        dom = _domain_by_name(model, ret.domain, ret.scope)
         primary = _domain_primary_power(model, dom) if dom else None
         if primary and primary in switched:
             findings.append(Finding(
@@ -1284,7 +1316,14 @@ def _switch_state_condition_without_control(model: PowerIntentModel):
                             (sw.off_state_condition, "off")):
             if not cond:
                 continue
-            if any(sw.control_port in tok for tok in cond):
+            # The condition may name the control *signal* or its *role*: a
+            # switch written as -control_port {ctrl en} with
+            # -on_state {on_s vin {ctrl}} refers to the port by role, and
+            # rejecting that would flag a correctly written switch.
+            referenced = {sw.control_port}
+            if sw.control_port_role:
+                referenced.add(sw.control_port_role)
+            if any(any(r in tok for r in referenced if r) for tok in cond):
                 continue
             findings.append(Finding(
                 rule="UPF-074", severity="warning",
@@ -1471,12 +1510,17 @@ def _unknown_control_signal(model: PowerIntentModel):
                         f"domain '{iso.domain}' is not in the design.",
                 line=iso.declared_line))
     for ret in model.retentions:
-        for sig in (ret.save_signal, ret.restore_signal):
-            if sig and not design.has_signal(sig):
+        # IEEE 1801 writes these as '{sig sense}'. The design holds the bare
+        # signal, so the polarity must be split off before lookup — otherwise
+        # the literal '{ret_en high}' can never match and a real signal is
+        # reported as absent from the design.
+        for sig, name in ((ret.save_signal, ret.save_signal_name),
+                          (ret.restore_signal, ret.restore_signal_name)):
+            if sig and not design.has_signal(name or sig):
                 findings.append(Finding(
                     rule="UPF-081", severity="warning",
-                    message=f"Retention signal '{sig}' for domain '{ret.domain}' "
-                            f"is not in the design.",
+                    message=f"Retention signal '{name or sig}' for domain "
+                            f"'{ret.domain}' is not in the design.",
                     line=ret.declared_line))
     for sw in model.switches.values():
         if sw.control_port and not design.has_signal(sw.control_port):
@@ -1665,7 +1709,7 @@ def _repeater_self_in_switchable(model: PowerIntentModel):
     for rep in model.repeaters:
         if rep.location != "self":
             continue
-        dom = _domain_by_name(model, rep.domain)
+        dom = _domain_by_name(model, rep.domain, getattr(rep, "scope", None))
         if dom is None:
             continue
         primary = _domain_primary_power(model, dom)

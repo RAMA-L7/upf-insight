@@ -1,0 +1,74 @@
+# IEEE 1801 option-form coverage corpus
+#
+# Hand-written to exercise the *legal* option spellings that real-world UPF
+# uses. Every command below is defined by IEEE 1801 and must not be reported
+# as UPF-002 "illegal option" or UPF-001 "unknown command".
+#
+# This file is a regression guard for the false positives recorded in
+# docs/validation/REAL_WORLD_REPORT.md — it is expected to be CLEAN.
+
+upf_version 2.1
+set_design_top top
+
+# ── supplies ───────────────────────────────────────────────────────────────
+create_supply_port VDD_TOP
+create_supply_net vdd_top_net
+connect_supply_net vdd_top_net -ports { VDD_TOP }
+
+create_supply_port VDD_CPU
+create_supply_net vdd_cpu_net
+connect_supply_net vdd_cpu_net -ports { VDD_CPU }
+
+create_supply_port VSS
+create_supply_net gnd_net
+connect_supply_net gnd_net -ports { VSS }
+
+create_supply_set SS_TOP -function { power vdd_top_net } -function { ground gnd_net }
+create_supply_set SS_CPU -function { power vdd_cpu_net } -function { ground gnd_net }
+
+# ── domains ────────────────────────────────────────────────────────────────
+# -include_scope is the standard way to scope a domain to the current scope.
+create_power_domain PD_TOP -include_scope -supply { primary SS_TOP }
+create_power_domain PD_CPU -elements { top/cpu } -supply { primary SS_CPU }
+
+# ── power switch: the -input_supply/-output_supply spelling ────────────────
+create_power_switch SW_CPU \
+   -domain PD_CPU \
+   -input_supply { vdd_top_net } \
+   -output_supply { vdd_cpu_net } \
+   -control_port CPU_PWR_EN \
+   -on_state { ON vdd_top_net {!CPU_PWR_EN} } \
+   -off_state { OFF {!CPU_PWR_EN} }
+
+# map_power_switch is defined by the standard.
+map_power_switch SW_CPU my_lib/power_switch_cell
+
+# ── isolation: _power_net/_ground_net + -location on the control ───────────
+set_isolation ISO_CPU \
+   -domain PD_CPU \
+   -elements { top/cpu/out_bus } \
+   -isolation_power_net vdd_top_net \
+   -isolation_ground_net gnd_net \
+   -clamp_value 0
+
+set_isolation_control ISO_CPU \
+   -domain PD_CPU \
+   -isolation_signal iso_en \
+   -isolation_sense low \
+   -location parent
+
+map_isolation_cell ISO_CPU my_lib/iso_cell
+
+# ── retention: _power_net/_ground_net spelling ─────────────────────────────
+set_retention RET_CPU \
+   -domain PD_CPU \
+   -elements { top/cpu/reg* } \
+   -retention_power_net vdd_top_net \
+   -retention_ground_net gnd_net
+
+set_retention_control RET_CPU \
+   -domain PD_CPU \
+   -save_signal { ret_en high } \
+   -restore_signal { ret_en low }
+
+map_retention_cell RET_CPU my_lib/retention_cell

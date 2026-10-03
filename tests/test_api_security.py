@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
 import pytest
@@ -86,3 +87,55 @@ def test_validate_content_ignores_files(server):
                   headers={"Content-Type": "application/json"})
     with urlopen(req, timeout=10) as r:
         assert r.status == 200
+
+# ── Request-body bounds ─────────────────────────────────────────────────────
+#
+# A malformed body must come back as a readable 4xx, not a dropped
+# connection, and an oversized one must be refused before it is read.
+
+def _post(base, body, path="/api/validate", extra_headers=None):
+    headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
+    req = Request(base + path, data=body, headers=headers)
+    try:
+        with urlopen(req, timeout=5) as r:
+            return r.status, r.read()
+    except HTTPError as e:
+        # Only a real HTTP status counts. A transport failure must surface as
+        # itself, not collapse to None -- masking it here is what made these
+        # assertions intermittently fail for the wrong reason.
+        return e.code, b""
+    except Exception as e:  # URLError, RemoteDisconnected, timeouts
+        return type(e).__name__, b""
+
+
+def test_valid_body_still_returns_200(server):
+    status, _ = _post(server, json.dumps({"content": "create_power_domain PD_A"}).encode())
+    assert status == 200
+
+
+def test_malformed_json_returns_400_not_a_dropped_connection(server):
+    status, _ = _post(server, b"not json at all")
+    assert status == 400
+
+
+def test_non_object_json_returns_400(server):
+    status, _ = _post(server, b"[1, 2, 3]")
+    assert status == 400
+
+
+def test_empty_body_is_accepted(server):
+    status, _ = _post(server, b"")
+    assert status == 200
+
+
+def test_oversized_body_is_refused_with_413(server):
+    oversized = str(api_server._MAX_BODY_BYTES + 1)
+    status, _ = _post(server, b"{}", extra_headers={"Content-Length": oversized})
+    assert status == 413
+
+
+def test_negative_content_length_returns_400(server):
+    status, _ = _post(server, b"{}", extra_headers={"Content-Length": "-5"})
+    assert status == 400

@@ -1,0 +1,10 @@
+# -state maps POSITIONALLY onto create_pst -supplies.
+# AnyCore ActiveList.upf:63-69. Defect: read as (supply, state) pairs.
+upf_version 2.1
+create_supply_net VDD
+create_supply_net VSS
+add_port_state VDD -state {ACTIVE 1.1} -state {OFF off}
+add_port_state VSS -state {ACTIVE 0.0}
+create_pst Core_OOO_PST -supplies { VDD VSS sw2/vout sw3/vout }
+add_pst_state ALL_OFF -pst Core_OOO_PST -state {ACTIVE ACTIVE OFF OFF}
+add_pst_state ALL_ON  -pst Core_OOO_PST -state {ACTIVE ACTIVE ACTIVE ACTIVE}
