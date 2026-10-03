@@ -336,8 +336,10 @@ def main() -> int:
     ap.add_argument("--verify-determinism", action="store_true",
                     help="run every file twice and compare")
     ap.add_argument("--load-set", action="store_true",
-                    help="also validate the whole corpus as one load set "
-                         "(the realistic hierarchical flow)")
+                    help="also validate the whole corpus as one load set. "
+                         "Resolves cross-file references but collides "
+                         "same-named objects from independent fragments; "
+                         "neither mode is faithful — see the validation report")
     args = ap.parse_args()
 
     names = list(CORPORA) if args.corpus == "all" else [args.corpus]
@@ -380,7 +382,7 @@ def main() -> int:
                   % c["determinism"]["identical"])
         ls = c.get("as_load_set")
         if ls and "error" not in ls:
-            print("   -- as one load set (realistic hierarchical flow) --")
+            print("   -- as one load set (NOT a faithful flow; see report) --")
             print("   measured: %d findings, %d FP (%.1f%%), %d domains, "
                   "%d nets, %d elements"
                   % (ls["findings"], ls["false_positives"],

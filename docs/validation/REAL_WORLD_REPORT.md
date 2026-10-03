@@ -1,9 +1,10 @@
 # UPF-Insight — Real-World Validation Report
 
-> **Validation tag:** `v0.3.1-validation.2`
+> **Validation tag:** `v0.3.0-validation.3`
 > **Date:** 2026-10-02
 > **Harnesses:** `scripts/validate_corpus.py` (shipped corpus),
-> `scripts/validate_external.py` (external open-source corpora)
+> `scripts/validate_external.py` (external open-source corpora),
+> `scripts/adjudicate.py` (per-finding adjudication)
 
 ---
 
@@ -323,8 +324,17 @@ Cascade removed: UPF-031 48→0, UPF-025 177→52, UPF-030 177→63, UPF-034 16�
 
 | Rule | Count | Verdict | Why |
 |---|---|---|---|
-| UPF-013 | 238 | DUPLICATE_OR_CASCADE | All 238 share subject `TOP` from 4 files. The corpus re-enters shared files into child scopes (`load_upf BTB.upf` under `/fs1`, `/btb`, …), which legitimately redefines names in a different scope. The duplicate detector does not scope-qualify, so one root floods 238 findings — 216 with **no file attribution at all**. Not 238 independent defects. |
-| UPF-038 | 220 | UNRESOLVED | Its verdict depends on PST analysis, which consumed the corrupted `supply_states` map. Held unresolved rather than guessed; re-adjudicate now that the mapping is fixed. |
+| UPF-013 | 238 | DUPLICATE_OR_CASCADE | All 238 share subject `TOP` from 4 files. The corpus re-enters shared files into child scopes (`load_upf BTB.upf` under `/fs1`, `/btb`, …), which legitimately redefines names in a different scope. The duplicate detector does not scope-qualify, so one root floods 238 findings. Not 238 independent defects. |
+| UPF-010 | 148 | IMPLEMENTATION_DEFECT (partial) | 72 of 148 name a switch output **port path** (`SW_x/vout`) the model already knows — the same gap fixed in UPF-038, not yet fixed here. The remaining 76 are scoped references whose defining file may be outside the load set; those stay UNRESOLVED rather than guessed. |
+
+### Adjudicated and fixed since
+
+| Rule | Count before | Verdict | Resolution |
+|---|---|---|---|
+| UPF-087 | 309 | IMPLEMENTATION_DEFECT | Bus bit-selects were treated as wildcards. **→ 0.** |
+| UPF-038 | 220 | IMPLEMENTATION_DEFECT + DUPLICATE_OR_CASCADE | A PST may name a switched supply by port path (`SW/vout`) as well as net; the IR discarded port roles. **220 → 80**, the residual 80 being the PST-collision cascade described in Part 1c. |
+| UPF-016 | 141 | VALID_ADVISORY | Self-declared `NETLIST_REQUIRED` boundary, not a finding about the UPF. No change. |
+| UPF-097 | 75 | VALID_ADVISORY | Same shape. No change. |
 
 ### Effect on the measured numbers
 

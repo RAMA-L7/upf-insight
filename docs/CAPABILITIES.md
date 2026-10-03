@@ -1,6 +1,8 @@
 # UPF-Insight — Capabilities
 
-> **Version:** v0.3.0 · commit `3ffa0b2` · tag `v0.3.0-validation.1`
+> **Version:** v0.3.0 · release tag `v0.3.0-validation.3`
+> (The per-release commit is the one the tag points at; this line names the
+> tag rather than a hash so it cannot go stale between releases.)
 > **Read with:** [`docs/validation/REAL_WORLD_REPORT.md`](validation/REAL_WORLD_REPORT.md)
 > — the limits below are measured, not aspirational.
 
