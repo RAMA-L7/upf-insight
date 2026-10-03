@@ -375,14 +375,54 @@ VERDICTS: Dict[str, dict] = {
         "evidence": "cascade of add_pst_state",
     },
     "UPF-038": {
-        "class": UNRESOLVED,
+        "class": IMPLEMENTATION_DEFECT,
         "reason": (
-            "Reports a switch output supply never being switched. Whether "
-            "that is correct depends on PST analysis, which currently "
-            "consumes the corrupted supply_states map, so it cannot be "
-            "separated from the add_pst_state defect without fixing that "
-            "first. Held UNRESOLVED rather than guessed."),
-        "evidence": "blocked on add_pst_state; re-adjudicate after the fix",
+            "Split verdict. 220 findings at v1.4a, of which ~140 were an "
+            "IMPLEMENTATION_DEFECT now fixed: `create_pst -supplies` may name "
+            "a switched supply either by its net (VDD_SW) or by the switch's "
+            "output PORT path (SW_CORE/vout) — both legal, and AnyCore uses "
+            "both (23 such columns). The PST compared only against net names, "
+            "so every port-named supply read as unmodeled. Fixed by retaining "
+            "the port roles in the IR (output_port_role/input_port_role) and "
+            "resolving a switch output under all its legal names. 220 -> 80. "
+            "The residual 80 are DUPLICATE_OR_CASCADE, not rule errors: nine "
+            "files each declare a PST named Core_OOO_PST with a *different* "
+            "supply list, and load-set mode keys PSTs by scope only, so the "
+            "last one silently overwrites the rest. FABSCALAR.upf's 11-column "
+            "PST is replaced by a 5-column one, whose columns of course do "
+            "not model those supplies."),
+        "evidence": ("source: ActiveList.upf:63 vs FABSCALAR.upf:230; "
+                     "PST collision counted across 9 files"),
+    },
+    "UPF-010": {
+        "class": IMPLEMENTATION_DEFECT,
+        "reason": (
+            "Mixed. 72 of 148 name a switch output PORT path (SW_x/vout) that "
+            "the model already knows about — the reference is legal IEEE 1801 "
+            "and the supply lookup does not resolve switch ports, the same gap "
+            "fixed in UPF-038. The other 76 are scoped references "
+            "(counter_gen[0].counterTable/VDD) whose defining file may be "
+            "outside the load set; those are held UNRESOLVED rather than "
+            "guessed."),
+        "evidence": "72/148 subjects are known switch port paths",
+    },
+    "UPF-016": {
+        "class": VALID_ADVISORY,
+        "reason": (
+            "141 findings, all the same message: `set_scope` targets cannot be "
+            "verified without a netlist. The rule asserts no defect — it "
+            "reports its own support boundary (support=NETLIST_REQUIRED) and "
+            "the checker downgrades it from error to warning. This is the "
+            "intended honest-boundary behaviour, not a finding about the UPF."),
+        "evidence": "message is a self-declared NETLIST_REQUIRED boundary",
+    },
+    "UPF-097": {
+        "class": VALID_ADVISORY,
+        "reason": (
+            "75 findings, same shape as UPF-016: hierarchical UPF composed via "
+            "load_upf cannot be cross-resolved without a netlist. Reports a "
+            "boundary, not a defect in the design."),
+        "evidence": "message is a self-declared NETLIST_REQUIRED boundary",
     },
     "UPF-013": {
         "class": DUPLICATE_OR_CASCADE,

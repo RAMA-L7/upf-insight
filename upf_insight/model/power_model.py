@@ -67,6 +67,12 @@ class PowerSwitch:
     #: Retained because on/off-state conditions may legitimately reference the
     #: role rather than the signal: ``-on_state {on_s vin {ctrl}}``.
     control_port_role: Optional[str] = None
+    #: Role halves of the supply-port pairs, e.g. ``{vout VDD_SW}`` yields
+    #: ``("vout", "vin")``. IEEE 1801 lets ``create_pst -supplies`` name a
+    #: switched supply by its *port path* (``SW/vout``) as well as by its net
+    #: name, so the role is needed to recognise a supply the PST does model.
+    output_port_role: Optional[str] = None
+    input_port_role: Optional[str] = None
     on_state: Optional[str] = None      # on-state name (from -on_state triple)
     off_state: Optional[str] = None     # off-state name (from -off_state triple)
     on_state_supply: Optional[str] = None       # supply port in the on-state triple
@@ -241,6 +247,11 @@ class PowerIntentModel:
     #: Built from the authoritative CommandRecord stream so findings can carry
     #: file provenance without each model object retaining it.
     record_files: Dict[int, List[str]] = field(default_factory=dict)
+    #: Every command record keyed by ``"<file>::<line>"`` -> verbatim text.
+    #: Line numbers repeat across files, so a global line index cannot say
+    #: *which* file a finding came from. This map can, and is what finding
+    #: provenance is resolved from (see ``resolve_provenance``).
+    record_texts: Dict[str, str] = field(default_factory=dict)
     #: basenames of every validated input file (for load_upf resolution)
     record_file_names: set = field(default_factory=set)
     unsupported_commands: List[str] = field(default_factory=list)

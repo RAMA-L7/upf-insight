@@ -258,3 +258,77 @@ def test_positional_and_pair_forms_coexist_in_one_table():
     by_name = {s.name: s.supply_states for s in pst.states}
     assert by_name["POS"] == {"vdd": "ON", "vss": "OFF"}
     assert by_name["PAIR"] == {"vdd": "ON", "vss": "ON"}
+
+# ---------------------------------------------------------------------------
+# UPF-038: a PST may name a switched supply by its port path
+# ---------------------------------------------------------------------------
+
+PORT_NAMED_PST = """
+upf_version 2.1
+create_supply_net VDD
+create_supply_net VDD_SW -domain PD_CPU
+create_power_domain PD_CPU -elements {u_cpu} -supply { primary VDD_SW }
+create_power_switch SW_CPU -domain PD_CPU \
+    -output_supply_port {vout VDD_SW} -input_supply_port {vin VDD} \
+    -control_port pwr_en -on_state {on_s vin {pwr_en}} \
+    -off_state {off_s {!pwr_en}}
+add_supply_state VDD_SW -state {ON 1.0} -state {OFF off}
+create_pst Core_PST -supplies { VDD SW_CPU/vout }
+add_pst_state ALL_OFF -pst Core_PST -state {ON OFF}
+"""
+
+
+def test_switch_port_role_is_retained_in_the_ir():
+    """The IR must keep the port role, not just the net.
+
+    `-output_supply_port {vout VDD_SW}` names both. Discarding the role made
+    the switch's output indistinguishable from a plain supply net.
+    """
+    model = build(PORT_NAMED_PST)
+    sw = next(iter(model.switches.values()))
+    assert sw.output_supply == "VDD_SW"
+    assert sw.output_port_role == "vout"
+    assert sw.input_port_role == "vin"
+
+
+def test_pst_naming_the_switch_port_path_counts_as_modeled():
+    """`SW_CPU/vout` is a legal way to name the switched supply.
+
+    The PST models the supply; UPF-038 must not call it unmodeled. This was
+    the entire content of UPF-038 on the AnyCore corpus.
+    """
+    assert "UPF-038" not in _codes(PORT_NAMED_PST)
+
+
+def test_pst_naming_the_net_also_counts_as_modeled():
+    """Negative control for the alias direction: net naming works too."""
+    text = PORT_NAMED_PST.replace(
+        "-supplies { VDD SW_CPU/vout }", "-supplies { VDD VDD_SW }")
+    assert "UPF-038" not in _codes(text)
+
+
+def test_genuinely_unmodeled_switch_still_reported():
+    """A switch output absent from the PST must still be flagged.
+
+    Guards against 'fixing' UPF-038 by suppressing it.
+    """
+    text = PORT_NAMED_PST.replace(
+        "create_pst Core_PST -supplies { VDD SW_CPU/vout }\n"
+        "add_pst_state ALL_OFF -pst Core_PST -state {ON OFF}\n",
+        "create_pst Core_PST -supplies { VDD }\n"
+        "add_pst_state ALL_OFF -pst Core_PST -state {ON}\n")
+    assert "UPF-038" in _codes(text)
+
+
+def test_switch_output_role_survives_the_non_port_spelling():
+    """`-output_supply VDD_SW` has no role; the alias falls back to 'vout'."""
+    model = build(
+        """
+        upf_version 2.1
+        create_power_switch SW -domain PD -input_supply VDD \
+            -output_supply VDD_SW -control_port en
+        """
+    )
+    sw = next(iter(model.switches.values()))
+    assert sw.output_supply == "VDD_SW"
+    assert sw.output_port_role is None

@@ -158,6 +158,30 @@ def analyze_cross_state(model: PowerIntentModel) -> List[dict]:
     switched = {sw.output_supply for sw in model.switches.values() if sw.output_supply}
     if not switched or not model.psts:
         return events
+    # A PST may name a switched supply either by its net (``VDD_SW``) or by the
+    # switch's output *port* path (``SW_CORE/vout``) — both are legal IEEE 1801
+    # and real files use both. Comparing only against net names reported every
+    # port-named supply as unmodeled, which was the whole of UPF-038 on the
+    # AnyCore corpus (23 such PST columns there).
+    #
+    # Map every name a switch output can legitimately go by -> its net, then
+    # collect the names the PSTs actually reference.
+    def _output_names(sw) -> set:
+        if not sw.output_supply:
+            return set()
+        role = sw.output_port_role or "vout"
+        return {sw.output_supply,
+                f"{sw.name}/{role}",
+                f"{sw.name}/{sw.output_supply}"}
+
+    referenced = {supply
+                  for pst in model.psts.values()
+                  for state in pst.states
+                  for supply in state.supply_states}
+    modeled_switch_outputs = {
+        sw.output_supply for sw in model.switches.values()
+        if _output_names(sw) & referenced
+    }
     isolated = {
         iso.domain for iso in model.isolation
         if iso.clamp_value and iso.control_signal
@@ -170,14 +194,22 @@ def analyze_cross_state(model: PowerIntentModel) -> List[dict]:
             modeled_nets.update(state.supply_states.keys())
 
         # Tri-state / floating: switchable net never modeled by the PST.
+        # `modeled_switch_outputs` already accounts for the port-path naming,
+        # so a supply referenced as SW/vout counts as modeled here.
         for dom in model.domains.values():
             net = _resolve_domain_power(model, dom)
-            if net and net in switched and net not in modeled_nets:
+            if net and net in switched and net not in modeled_switch_outputs:
                 events.append({
                     "type": "unmodeled_switch",
                     "pst": pst.name,
                     "domain": dom.name,
                     "net": net,
+                    # Provenance travels with the event so the rule can
+                    # attribute the finding to the domain's declaration
+                    # instead of leaving file/line empty.
+                    "subject": dom.name,
+                    "file": getattr(dom, "declared_file", None),
+                    "line": getattr(dom, "declared_line", None),
                 })
 
         # Cross-state: un-isolated power-down into a live receiver.

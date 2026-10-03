@@ -277,6 +277,8 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
             files.append(rec.file)
         if rec.file:
             model.record_file_names.add(os.path.basename(rec.file))
+            # Unambiguous (file, line) -> command text, for provenance.
+            model.record_texts.setdefault(f"{rec.file}::{rec.line}", rec.text)
         try:
             tokens = _tokenize(rec)
         except Exception:
@@ -449,6 +451,19 @@ def _signal_pair(value: Optional[str]) -> tuple:
             return None, None
         return parts[0], (parts[1] if len(parts) > 1 else None)
     return cleaned or None, None
+
+
+def _opt_any(args: List[str], *opts: str) -> Optional[str]:
+    """First present value among ``opts``, respecting spelling order.
+
+    ``_get_opt`` takes a single option (its third argument is a *default*,
+    which is an easy way to silently mis-read an alias as a fallback value).
+    """
+    for opt in opts:
+        val = _get_opt(args, opt)
+        if val is not None:
+            return val
+    return None
 
 
 def _pair_role(value: Optional[str]) -> Optional[str]:
@@ -632,6 +647,10 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             output_supply=out_supply,
             control_port=_pair_value(_get_opt(args, "-control_port")),
             control_port_role=_pair_role(_get_opt(args, "-control_port")),
+            output_port_role=_pair_role(
+                _opt_any(args, "-output_supply", "-output_supply_port")),
+            input_port_role=_pair_role(
+                _opt_any(args, "-input_supply", "-input_supply_port")),
             on_state=on_name or None,
             off_state=off_name or None,
             on_state_supply=on_supply or None,

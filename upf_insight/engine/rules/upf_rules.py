@@ -435,6 +435,9 @@ def _switchable_net_not_modeled(model: PowerIntentModel):
                 f"PST state; its tri-state/floating power behavior cannot be "
                 f"verified."
             ),
+            line=ev.get("line"),
+            file=ev.get("file") or "",
+            subject=ev.get("subject") or ev["domain"],
             support="NETLIST_REQUIRED"))
     return findings
 
