@@ -354,6 +354,66 @@ different load orders. **When quoting a load-set figure, state the enumeration
 method.** `scripts/validate_external.py` and `scripts/adjudicate.py` currently
 differ here; they should agree on one canonical order.
 
+### A stronger caveat: load-set mode is not a faithful flow for this corpus
+
+Chasing the 80 residual UPF-038 findings exposed something that qualifies the
+previous turn's framing. Load-set mode was presented as "the realistic
+hierarchical flow". For a corpus of **independent fragments** it is not.
+
+**Nine files each declare a PST named `Core_OOO_PST`, each with a different
+supply list.** The model keys PSTs by scope only, so in load-set mode all nine
+land at top scope and the last one silently overwrites the rest.
+`FABSCALAR.upf`'s 11-column PST is replaced by a 5-column one — whose columns,
+of course, do not model the supplies the 11-column one did. The residual
+UPF-038 findings are that cascade, not rule errors.
+
+This is the same shape as the UPF-013 finding: **redundant definitions are
+overwritten silently and lossily, and downstream rules then reason about a
+model that no single author wrote.** In the intended flow each fragment is
+loaded into its own scope, where the names do not collide.
+
+Neither mode is faithful on its own:
+
+* **per-file** — no cross-file collisions, but under-reports: supplies
+  declared in a child and referenced by the parent read as undefined.
+* **load-set** — resolves cross-file references, but collides same-named
+  objects from independent fragments.
+
+Both are reported. Neither is claimed as the real flow.
+
+## Part 1d — Quality metrics (why there is no single accuracy number)
+
+`scripts/adjudicate.py` reports a metrics panel rather than one false-positive
+rate, because a single rate conflates "could not read the file" with "read it
+and disagreed", and silently treats unadjudicated findings as either correct
+or incorrect. Measured on AnyCore (load-set, 37 files):
+
+| Metric | Value |
+|---|---|
+| Files processed | 37 |
+| Total findings | 1546 |
+| Parse-stage findings | **0** |
+| Grammar-layer FP | 32 (2.1%) |
+| Adjudicated | 799 (51.7%) |
+| **Unresolved** | **747 (48.3%)** |
+| Cascade / duplicate | 547 (35.4%) |
+| With file provenance | 27.4% |
+| Stage split | MODEL 641 · SEMANTIC 498 · DESIGN 375 · NORMALIZATION 32 |
+| Adjudicated classes | IMPLEMENTATION_DEFECT 345 · DUPLICATE_OR_CASCADE 238 · VALID_ADVISORY 216 |
+
+Three of these were invisible inside a single aggregate number:
+
+- **48.3% of findings are UNRESOLVED.** They are counted as neither true nor
+  false. Any overall precision figure folding them in would be meaningless.
+- **35.4% share a subject** with another finding — cascades, not independent
+  evidence.
+- **27.4% carry file provenance.** That is the real cost of the
+  `record_files` line-number-only limitation, now measured rather than
+  described. It has since been improved to (file, line) resolution with
+  subject-based fallback; see Part 1b.
+
+`PARSE 0` is the grammar-layer claim, now attributable rather than asserted.
+
 ## Part 2 — Real open-source projects (AnyCore, Tenstorrent)
 
 The small corpus above was written to isolate specific defects. These results

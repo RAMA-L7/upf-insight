@@ -136,24 +136,30 @@ failure. `--gate`/`--baseline` apply policy to CI pipelines.
 
 | Property | Status |
 |---|---|
-| Test suite | 341 passing (no xfail remaining) |
+| Test suite | 411 passing (no xfail remaining) |
+| Regression fixtures | 10 named UPF files, one per real-world defect found |
 | Mutation corpus | 42/42 seeded defects detected (100% recall) |
 | Mutation precision | **0.57** — the engine fires on 43% of its own findings |
 | Shipped-corpus FP rate | **0%** (0 of 21 findings) |
-| External FP rate | **1.4%** on AnyCore RISC-V (32 of 2268, load-set); **0.0%** on Tenstorrent |
+| Parse-stage findings (AnyCore) | **0** — grammar layer attributable, not asserted |
+| Grammar-layer FP (AnyCore) | 32 of 1546 (2.1%), load-set |
+| Findings adjudicated | 51.7%; **48.3% remain explicitly UNRESOLVED** |
+| Cascade / duplicate rate | 35.4% of findings share a subject |
 | Registry/handler parity | exact, audit-clean |
 | Determinism | byte-identical on repeat runs, incl. both external corpora |
 | Design-aware layer | exercised against a Yosys-synthesized netlist |
+| Stage attribution + evidence | every finding carries `stage` and `evidence` |
 
-Recall is excellent; **precision on both the shipped and the external corpora is
-now low**. The honest caveat is the size of the *unclassified* bucket: 2236 of
-the 2268 AnyCore findings are `ambiguous/needs-review`, meaning no predicate
-claimed them — **not** that they were verified correct. No UPF oracle exists in
-this environment to adjudicate them differentially (OpenSTA and Surelog are
-absent). Treat the 1.4% as "the parser and grammar layer no longer invents
-findings", not as "every remaining finding is a true positive".
+**There is deliberately no single accuracy or precision number.** Nearly half of
+the corpus findings are UNRESOLVED — adjudicated as neither true nor false —
+and no independent UPF oracle exists in this environment (OpenSTA and Surelog
+are absent). A rate computed by folding unresolved findings into either class
+would be meaningless, so none is published.
 
-Recall is excellent; **the remaining weakness is adjudication, not detection.**
+What *is* established: the grammar layer no longer invents findings (PARSE
+stage = 0 on 37 files of production UPF), output is byte-identical across runs,
+and the source corpora are provably unmodified. What is not: whether the
+surviving semantic findings are correct. That is the open work.
 
 ## Who should use it
 
