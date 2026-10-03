@@ -1,0 +1,9 @@
+# A multi-line brace group is ONE command, not N+1.
+# AnyCore RamPartitioned.upf / BPU.upf. Defect D4.
+upf_version 2.1
+create_power_domain PD_RAM -include_scope
+create_power_domain PD_PART1 -elements {
+  INST_LOOP[1].ram_inst
+  INST_LOOP[2].ram_inst
+  INST_LOOP[3].ram_inst
+}

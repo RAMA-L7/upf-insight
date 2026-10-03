@@ -1,0 +1,10 @@
+# {role signal} pair: the role is not the signal.
+# AnyCore ActiveList.upf:44. Defect D13.
+upf_version 2.1
+create_supply_net VDD
+create_supply_net VDD_SW -domain PD
+create_power_domain PD -elements {u_cpu} -supply { primary VDD_SW }
+create_power_switch SW -domain PD \
+    -output_supply_port {vout VDD_SW} -input_supply_port {vin VDD} \
+    -control_port {ctrl en0} \
+    -on_state {on_s vin {ctrl}} -off_state {off_s {!ctrl}}

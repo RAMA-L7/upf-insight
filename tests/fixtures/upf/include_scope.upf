@@ -1,0 +1,5 @@
+# -include_scope may PRECEDE the domain name.
+# AnyCore RamPartitioned.upf:2. Defect D8 (phantom domain '-include_scope').
+upf_version 2.1
+create_power_domain -include_scope PD_RAM
+create_supply_net VDD

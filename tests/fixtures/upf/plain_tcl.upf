@@ -1,0 +1,7 @@
+# A .upf file is a Tcl script. Plain Tcl is not a UPF command.
+# AnyCore FetchStage1.upf:6. Defect D9.
+upf_version 2.1
+set CURRENT_SCOPE [set_scope core_a]
+create_power_domain PD_BPU0
+source ./common_defs.upf
+foreach x {a b} { puts $x }
