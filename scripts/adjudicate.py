@@ -261,6 +261,8 @@ def build_inventory(corpus: str, netlist: Optional[str] = None,
                 "normalized_message": normalize_message(f.message),
                 "scope": getattr(mdl, "current_scope", None),
                 "support": getattr(f, "support", None),
+                "stage": f.stage,
+                "evidence": list(getattr(f, "evidence", []) or []),
                 "subject": getattr(f, "subject", None),
                 "blocked_by": getattr(f, "blocked_by", ""),
                 "rule_meta": meta.get(f.rule, {}),
@@ -464,6 +466,87 @@ def summarize(inv: dict, cl: dict) -> dict:
 
 # ---------------------------------------------------------------------------
 
+def quality_metrics(inv: dict, cl: dict) -> dict:
+    """The metrics panel from the roadmap, replacing a single FP number.
+
+    A single false-positive rate hides more than it shows: it conflates "could
+    not read the file" with "read it and disagreed", and it silently treats
+    unadjudicated findings as either correct or incorrect. These metrics keep
+    the distinctions visible.
+    """
+    rows = inv["findings"]
+    total = len(rows)
+    by_rule = dict(cl["by_rule_count"])
+
+    adjudicated = Counter()
+    for rule, n in by_rule.items():
+        v = VERDICTS.get(rule)
+        if v:
+            adjudicated[v["class"]] += n
+    adjudicated_total = sum(adjudicated.values())
+
+    stages = Counter()
+    for r in rows:
+        stages[r.get("stage") or "SEMANTIC"] += 1
+
+    # Cascade / duplicate signal: many findings sharing one subject, or many
+    # findings on one rule sharing a normalized message and no file.
+    by_subject = Counter(r.get("subject") or "(none)" for r in rows)
+    cascade_findings = sum(n for s, n in by_subject.items()
+                           if s != "(none)" and n > 1)
+
+    grammar_fp = sum(n for rule, n in by_rule.items()
+                     if rule in ("UPF-001", "UPF-002", "UPF-003", "UPF-024"))
+
+    unresolved = adjudicated.get(UNRESOLVED, 0) + (total - adjudicated_total)
+
+    return {
+        "files_processed": inv.get("files"),
+        "mode": inv.get("mode"),
+        "total_findings": total,
+        "parse_stage_findings": stages.get("PARSE", 0),
+        "grammar_layer_fp": grammar_fp,
+        "grammar_fp_rate": round(grammar_fp / total * 100, 1) if total else 0.0,
+        "stages": dict(stages),
+        "adjudicated": adjudicated_total,
+        "adjudicated_pct": round(adjudicated_total / total * 100, 1) if total else 0.0,
+        "by_class": dict(adjudicated),
+        "unresolved": unresolved,
+        "unresolved_pct": round(unresolved / total * 100, 1) if total else 0.0,
+        "distinct_rules": len(by_rule),
+        "cascade_findings": cascade_findings,
+        "cascade_pct": round(cascade_findings / total * 100, 1) if total else 0.0,
+        "findings_with_provenance": sum(1 for r in rows if r.get("file")),
+        "provenance_pct": (
+            round(sum(1 for r in rows if r.get("file")) / total * 100, 1)
+            if total else 0.0),
+    }
+
+
+def print_metrics(m: dict) -> None:
+    print("\n-- quality metrics --")
+    rows = [
+        ("Files processed", m["files_processed"]),
+        ("Mode", m["mode"]),
+        ("Total findings", m["total_findings"]),
+        ("Parse-stage findings", m["parse_stage_findings"]),
+        ("Grammar-layer FP", "%d (%.1f%%)" % (m["grammar_layer_fp"],
+                                              m["grammar_fp_rate"])),
+        ("Adjudicated", "%d (%.1f%%)" % (m["adjudicated"], m["adjudicated_pct"])),
+        ("Unresolved", "%d (%.1f%%)" % (m["unresolved"], m["unresolved_pct"])),
+        ("Cascade/duplicate", "%d (%.1f%%)" % (m["cascade_findings"],
+                                               m["cascade_pct"])),
+        ("With file provenance", "%.1f%%" % m["provenance_pct"]),
+        ("Stage split", m["stages"]),
+    ]
+    for label, value in rows:
+        print("  %-22s %s" % (label, value))
+    if m["by_class"]:
+        print("  Adjudicated classes:")
+        for k, v in sorted(m["by_class"].items(), key=lambda kv: -kv[1]):
+            print("     %5d  %s" % (v, k))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -484,7 +567,8 @@ def main() -> int:
             continue
         cl = cluster(inv)
         data[name] = {"inventory": inv, "clusters": cl,
-                      "summary": summarize(inv, cl)}
+                      "summary": summarize(inv, cl),
+                      "metrics": quality_metrics(inv, cl)}
     if args.out:
         Path(args.out).write_text(json.dumps(data, indent=2, default=str),
                                   encoding="utf-8")
@@ -494,9 +578,10 @@ def main() -> int:
             print("== %s UNAVAILABLE: %s" % (name, d.get("reason")))
             continue
         s = d["summary"]
-        print("\n== %s: %d findings across %d files"
-              % (name, s["total_findings"], s["files"]))
-        print("%-10s %7s  %s" % ("RULE", "COUNT", "VERDICT"))
+        print("\n== %s: %d findings across %d files (%s)"
+              % (name, s["total_findings"], s["files"], d["metrics"]["mode"]))
+        print_metrics(d["metrics"])
+        print("\n%-10s %7s  %s" % ("RULE", "COUNT", "VERDICT"))
         for rule, n in d["clusters"]["by_rule_count"]:
             v = VERDICTS.get(rule, {}).get("class", UNRESOLVED)
             print("%-10s %7d  %s" % (rule, n, v))
