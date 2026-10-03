@@ -63,6 +63,10 @@ class PowerSwitch:
     input_supply: Optional[str] = None
     output_supply: Optional[str] = None
     control_port: Optional[str] = None
+    #: Role half of a ``-control_port {role signal}`` pair (e.g. ``ctrl``).
+    #: Retained because on/off-state conditions may legitimately reference the
+    #: role rather than the signal: ``-on_state {on_s vin {ctrl}}``.
+    control_port_role: Optional[str] = None
     on_state: Optional[str] = None      # on-state name (from -on_state triple)
     off_state: Optional[str] = None     # off-state name (from -off_state triple)
     on_state_supply: Optional[str] = None       # supply port in the on-state triple
@@ -156,6 +160,15 @@ class RetentionStrategy:
     retention_supply: Optional[str] = None
     save_signal: Optional[str] = None
     restore_signal: Optional[str] = None
+    #: Signal halves of ``-save_signal {sig sense}`` / ``-restore_signal``, with
+    #: the polarity split off. ``save_signal`` keeps the raw token for
+    #: provenance; these carry the bare signal so design-aware rules can
+    #: resolve it against real design objects instead of comparing against the
+    #: literal string ``'{save high}'``.
+    save_signal_name: Optional[str] = None
+    save_signal_sense: Optional[str] = None
+    restore_signal_name: Optional[str] = None
+    restore_signal_sense: Optional[str] = None
     control_signal: Optional[str] = None  # from set_retention_control -retention_signal
     declared_line: Optional[int] = None
     declared_file: Optional[str] = None

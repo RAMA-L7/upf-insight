@@ -136,25 +136,24 @@ failure. `--gate`/`--baseline` apply policy to CI pipelines.
 
 | Property | Status |
 |---|---|
-| Test suite | 309 passing (no xfail remaining) |
+| Test suite | 341 passing (no xfail remaining) |
 | Mutation corpus | 42/42 seeded defects detected (100% recall) |
 | Mutation precision | **0.57** — the engine fires on 43% of its own findings |
-| Real-world FP rate | **0%** on `tests/corpus/` (0 of 21); all 21 findings are genuine / needs-review |
+| Shipped-corpus FP rate | **0%** (0 of 21 findings) |
+| External FP rate | **1.4%** on AnyCore RISC-V (32 of 2268, load-set); **0.0%** on Tenstorrent |
 | Registry/handler parity | exact, audit-clean |
-| Determinism | byte-identical on repeat runs |
+| Determinism | byte-identical on repeat runs, incl. both external corpora |
+| Design-aware layer | exercised against a Yosys-synthesized netlist |
 
-Recall is excellent; **precision on the shipped corpus is now clean.** The
-caveat worth stating plainly: 0% is measured on the two files in
-`tests/corpus/`, one of which we wrote ourselves to cover legal option
-spellings. The external open-source projects measured in
-`docs/validation/REAL_WORLD_REPORT.md` (65% at v0.3.0) have not been
-re-measured — that UPF is not redistributed here. Those defects have been
-fixed at the grammar, so 65% is a historical upper bound rather than a current
-claim, but confirming it means re-running those corpora.
+Recall is excellent; **precision on both the shipped and the external corpora is
+now low**. The honest caveat is the size of the *unclassified* bucket: 2236 of
+the 2268 AnyCore findings are `ambiguous/needs-review`, meaning no predicate
+claimed them — **not** that they were verified correct. No UPF oracle exists in
+this environment to adjudicate them differentially (OpenSTA and Surelog are
+absent). Treat the 1.4% as "the parser and grammar layer no longer invents
+findings", not as "every remaining finding is a true positive".
 
-Recall is excellent; **precision is the remaining weakness**, and the evidence
-for that is now confined to the mutation corpus (0.57) and the un-re-measured
-external projects.
+Recall is excellent; **the remaining weakness is adjudication, not detection.**
 
 ## Who should use it
 

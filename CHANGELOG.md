@@ -7,6 +7,67 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Measured - external corpora re-validated (AnyCore 65% -> 1.4%, Tenstorrent 100% -> 0%)
+
+Both external corpora named in `docs/validation/REAL_WORLD_REPORT.md` were
+located on this host and re-measured against the current engine. The historical
+65% / 100% figures were previously labelled unverified; they are now replaced
+by measurements.
+
+| Corpus | Historical | Measured now |
+|---|---|---|
+| AnyCore RISC-V (37 files, `power_spec/*.upf` @ `419cc6c`) | 4012 findings, 65% FP | **2268 findings, 32 FP (1.4%)** |
+| Tenstorrent AOU (1 file, 9 commands, Apache-2.0) | 1 finding, 100% FP | **0 findings, 0 FP** |
+
+- `scripts/validate_external.py` — new harness. Read-only (SHA-256 manifest
+  compared before/after each run), deterministic (`--verify-determinism` runs
+  each corpus twice and compares), and it reports each finding in exactly one of
+  five categories: parser failure / normalization failure / genuine semantic /
+  ambiguous / validator defect. A corpus that is absent is reported as
+  `unavailable` with the reason, never skipped silently.
+- `--load-set` mode validates a whole corpus as one load set, which is how
+  hierarchical UPF is actually consumed. Per-file is 5.0% FP; load-set is
+  **1.4%**, because a top file `load_upf`s children into named scopes and
+  single-file validation under-reports the model.
+- `tests/test_external_corpus_regressions.py` — 23 hard assertions, one per
+  defect found below.
+- `tests/fixtures/soc_top.v` + `soc_top.upf` and
+  `tests/test_netlist_design_aware.py` — RTL -> Yosys -> synthesized netlist ->
+  UPF -> design-aware validation, including a negative control proving a
+  genuinely absent signal is still reported.
+
+### Fixed - nine defects found only in real open-source UPF
+
+None of these were visible from the shipped corpus; each was found by running
+the external corpora and inspecting the original UPF construct.
+
+- **Backslash continuation inside braces** — Tcl treats a backslash before a
+  newline as whitespace *everywhere*, including inside `{}`. The lexer
+  preserved it, putting a literal `\` into multi-line port lists and producing
+  "unknown target `'\'`" once per continuation. Also handles `…  \ ` with a
+  trailing space after the backslash, which AnyCore emits.
+- **`create_power_domain -include_scope PD_RAM`** — real UPF puts flags before
+  the name, so `args[0]` named the domain `-include_scope` and the real name was
+  lost. The name is now the first positional argument.
+- **Plain Tcl reported as unknown UPF** — a `.upf` file is a Tcl script;
+  `set`, `source`, `foreach`, `[set_scope …]` are not UPF commands and no longer
+  raise UPF-001. Genuinely unknown commands are still reported.
+- **`create_supply_net -domain` / `-reuse` / `-exclude`** — legal IEEE 1801,
+  previously rejected (543 findings in AnyCore alone).
+- **`create_power_domain -scope`** — legal IEEE 1801, previously rejected.
+- **`set_isolation -diff_supply_only`** — legal IEEE 1801, previously rejected.
+- **`-control_port {ctrl sig}` pairs** — the pair's first half names the port
+  *role*, not the signal. Rules were comparing the braced literal against the
+  design. The signal half is now extracted; the role is retained so a condition
+  legitimately referencing `{ctrl}` is not flagged.
+- **Relative `set_scope` composition** — `set_scope` assigned absolutely,
+  dropping the prefix a child was loaded into, so supplies were keyed `btb/VDD`
+  while the parent referenced `fs1/btb/VDD`. Relative scopes now compose;
+  restating the current scope stays idempotent.
+- **`UPF-081` compared `{sig sense}` against the design** — `-save_signal
+  {ret_en high}` could never match. Now split into `save_signal_name` /
+  `save_signal_sense`, verified against a synthesized netlist.
+
 ### Fixed - real-world false positives (shipped corpus now 0%)
 
 The parser and grammar defects recorded in the v0.3.0 validation report are

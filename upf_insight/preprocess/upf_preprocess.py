@@ -119,24 +119,32 @@ def preprocess(text: str, file: str = "<string>") -> List[CommandRecord]:
             i += 1
             continue
 
-        # --- line continuation: backslash at EOL, outside quotes/braces/brackets ---
-        if c == "\\" and (
-            nxt == "\n"
-            or (nxt == "\r" and i + 2 < n and text[i + 2] == "\n")
-        ):
-            if brace == 0 and bracket == 0 and not dq:
+        # --- line continuation: backslash before (optional spaces and) EOL ---
+        #
+        # A backslash standing for whitespace before a newline is a line
+        # continuation *everywhere*, including inside braces. Real UPF relies
+        # on this in multi-line lists, e.g.
+        #
+        #     connect_supply_net VSS -ports { VSS  \
+        #                                      dom0/VSS  \
+        #                                      dom1/VSS }
+        #
+        # Preserving the backslash put a literal '\' into the port list, which
+        # then surfaced as a bogus "unknown target '\'" (UPF-024) once per
+        # continuation. Some files emit "…  \ " with a trailing space *after*
+        # the backslash, so the run of spaces/tabs between the backslash and
+        # the newline is consumed too — the backslash means "this is
+        # whitespace", and the spaces it introduces are the same whitespace.
+        if c == "\\":
+            j = i + 1
+            while j < n and text[j] in (" ", "\t"):
+                j += 1
+            if j < n and (text[j] == "\n" or
+                          (text[j] == "\r" and j + 1 < n and text[j + 1] == "\n")):
                 buf.append(" ")
-                if nxt == "\r":
-                    i += 3
-                else:
-                    i += 2
+                i = j + 2 if text[j] == "\r" else j + 1
                 line += 1
                 continue
-            # literal backslash inside a construct -- keep it verbatim
-            mark()
-            buf.append(c)
-            i += 1
-            continue
 
         # --- comment: '#' outside braces/brackets/quotes, at command start or
         #     preceded by whitespace (so 'foo#bar' and '#' inside {} [] "" survive) ---

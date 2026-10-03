@@ -1291,7 +1291,14 @@ def _switch_state_condition_without_control(model: PowerIntentModel):
                             (sw.off_state_condition, "off")):
             if not cond:
                 continue
-            if any(sw.control_port in tok for tok in cond):
+            # The condition may name the control *signal* or its *role*: a
+            # switch written as -control_port {ctrl en} with
+            # -on_state {on_s vin {ctrl}} refers to the port by role, and
+            # rejecting that would flag a correctly written switch.
+            referenced = {sw.control_port}
+            if sw.control_port_role:
+                referenced.add(sw.control_port_role)
+            if any(any(r in tok for r in referenced if r) for tok in cond):
                 continue
             findings.append(Finding(
                 rule="UPF-074", severity="warning",
@@ -1478,12 +1485,17 @@ def _unknown_control_signal(model: PowerIntentModel):
                         f"domain '{iso.domain}' is not in the design.",
                 line=iso.declared_line))
     for ret in model.retentions:
-        for sig in (ret.save_signal, ret.restore_signal):
-            if sig and not design.has_signal(sig):
+        # IEEE 1801 writes these as '{sig sense}'. The design holds the bare
+        # signal, so the polarity must be split off before lookup — otherwise
+        # the literal '{ret_en high}' can never match and a real signal is
+        # reported as absent from the design.
+        for sig, name in ((ret.save_signal, ret.save_signal_name),
+                          (ret.restore_signal, ret.restore_signal_name)):
+            if sig and not design.has_signal(name or sig):
                 findings.append(Finding(
                     rule="UPF-081", severity="warning",
-                    message=f"Retention signal '{sig}' for domain '{ret.domain}' "
-                            f"is not in the design.",
+                    message=f"Retention signal '{name or sig}' for domain "
+                            f"'{ret.domain}' is not in the design.",
                     line=ret.declared_line))
     for sw in model.switches.values():
         if sw.control_port and not design.has_signal(sw.control_port):

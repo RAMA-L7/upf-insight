@@ -1,47 +1,76 @@
 # UPF-Insight — Real-World Validation Report
 
-> **Validation tag:** `v0.3.0-validation.1`
-> **Tool version:** v0.3.0 · commit `3ffa0b2` · branch `fix/cross-file-scope-and-support-boundary`
-> **Date:** 2026-10-01
-> **Harness:** `scripts/validate_corpus.py` (re-runnable, committed)
+> **Validation tag:** `v0.3.1-validation.2`
+> **Date:** 2026-10-02
+> **Harnesses:** `scripts/validate_corpus.py` (shipped corpus),
+> `scripts/validate_external.py` (external open-source corpora)
 
 ---
 
 ## Headline
 
-> **Status: the P0 grammar work has landed.** Every false-positive class this
-> report identified (D1 grammar coverage, D4 multi-line brace groups, D5
-> supply-port pairs, brace-group expansion, `map_power_switch`) is fixed and
-> pinned by hard assertions in `tests/test_real_world_corpus.py` — the former
-> `xfail` markers are inverted, which was this report's acceptance criterion.
+> **The external corpora referenced by this report were located on this host and
+> re-measured.** Both are present and were run against the current engine:
 >
-> **Shipped-corpus false-positive rate is now 0.0% (0 of 21 findings).** All 21
-> remaining findings bucket as `genuine/needs-review`. Reproduce with
-> `python scripts/validate_corpus.py --json tests/corpus/`.
+> | Corpus | Provenance | Historical | **Measured now** |
+> |---|---|---|---|
+> | AnyCore RISC-V | `anycore/anycore-riscv-src` @ `419cc6c`, `power_spec/*.upf`, 37 files | 4012 findings, **65% FP** | **2268 findings, 32 FP (1.4%)** |
+> | Tenstorrent AOU | `aou_core_top.upf`, Apache-2.0, 1 file / 9 commands | 1 finding, **100% FP** | **0 findings, 0 FP (0.0%)** |
 >
-> The figures below are the **pre-fix v0.3.0 measurement**, retained as the
-> before-picture. The external open-source figures (AnyCore, Tenstorrent) have
-> **not** been re-measured — that UPF is not redistributed here, so they cannot
-> be re-run and should not be read as current. Everything they attribute to the
-> grammar defects is the code fixed below, but treat 65%/100% as a historical
-> upper bound rather than a present claim.
+> Reproduce with:
+> `python scripts/validate_external.py --corpus all --load-set --verify-determinism`
+>
+> The external files were **not modified** — a SHA-256 manifest is taken before
+> and after each run and compared (`source_integrity.unmodified: true`).
+> Determinism was verified by running each corpus twice and comparing per-file
+> results byte-for-byte.
+
+### Measured vs historical
+
+| Metric | v0.3.0 (historical) | Current (measured) |
+|---|---|---|
+| AnyCore findings | 4012 | 2268 |
+| AnyCore FP rate | 65% (2619 of 4012) | **1.4% (32 of 2268)** |
+| AnyCore syntax-layer (UPF-001/002/003) | 994 | **0** |
+| AnyCore domains parsed | ~0 (model starved by D4) | 123 |
+| Tenstorrent findings | 1 | **0** |
+| Tenstorrent FP rate | 100% | **0.0%** |
+| Shipped corpus FP rate | 44% (15 of 34) | 0.0% (0 of 21) |
+| Determinism | not verified here | byte-identical across two runs |
+
+**Two measurement modes are reported and they differ, for a structural reason.**
+Hierarchical UPF is not a set of independent files: a top file `load_upf`s
+children into named scopes, and supplies declared in a child are referenced by
+the parent. Validating each file alone under-reports the model:
+
+| Mode | Findings | FP | Rate |
+|---|---|---|---|
+| Per-file (each of 37 files alone) | 2418 | 122 | 5.0% |
+| **As one load set (realistic flow)** | **2268** | **32** | **1.4%** |
+
+The 1.4% figure is the honest one for how this UPF is actually consumed. Both
+are reproducible with and without `--load-set`.
+
+### What remains
+
+32 residual UPF-024 findings, all in hierarchical files validated **per-file** —
+i.e. cross-file references whose defining file was not in the load set. These
+are an artifact of the single-file mode, not parser defects: they do not occur
+in the load-set run at the same rate, and no UPF-001/002/003 fires anywhere.
+
+The 2236 remaining findings bucket as `ambiguous/needs-review`. They were **not**
+individually adjudicated against a reference tool — no UPF oracle exists in this
+environment (OpenSTA and Surelog are absent; see `docs/validation/EDA_ENVIRONMENT.md`).
+Treat that bucket as *unclassified*, not as *verified-correct*.
+
+---
+
+## Historical record (v0.3.0, retained for comparison)
 
 **Measured at v0.3.0, on UPF the tool did not write, UPF-Insight produced a 56%
-false-positive rate.** 53 of 95 findings on the validation corpus were tool
-defects, not defects in the designs.
-
-**On production open-source UPF the rate was worse: 65% across 37 files from
-the AnyCore RISC-V processor, and 100% on a 9-command valid file from
-Tenstorrent.** Details in Part 2.
-
-| Metric | v0.3.0 (pre-fix) | Current |
-|---|---|---|
-| Real open-source projects | 2 (AnyCore RISC-V, Tenstorrent AOU) | not re-measured |
-| Real-project findings | 4013 across 38 files | not re-measured |
-| Real-project FP rate | 65% (AnyCore), 100% (Tenstorrent) | not re-measured |
-| Shipped corpus FP rate | 15 of 34 (44%) | **0 of 21 (0.0%)** |
-| Genuine / needs-review | 19 (56%) | 21 (100%) |
-| Tool-generated file | 0% FP | 0% FP |
+false-positive rate** on the validation corpus. On production open-source UPF
+the rate was 65% across 37 AnyCore files and 100% on a valid 9-command
+Tenstorrent file. Details in Part 2.
 
 > **Note on the external file.** The headline 56% figure includes one
 > third-party UPF (a 204-line UPF 2.1 SoC from an unrelated local project).
@@ -172,6 +201,74 @@ These are real and useful — the tool is not merely noisy:
 - **UPF-036** — strategies present with no PST to condition them.
 
 This is the signal the tool exists to produce, and it is working.
+
+## Part 1b — Defects found by re-running the external corpora
+
+These were **not** visible from the shipped corpus. Each was found by running
+the current engine over `anycore/anycore-riscv-src` and inspecting the original
+UPF construct, and each is now pinned by a hard assertion in
+`tests/test_external_corpus_regressions.py`.
+
+| # | Defect | Evidence in real UPF | FP removed |
+|---|---|---|---|
+| D7 | Backslash line-continuation inside braces preserved as a literal `\` | `BPU.upf:176`, `Decode.upf:54` — `-ports {VSS \` continued across lines | ~130 |
+| D8 | `create_power_domain -include_scope PD_RAM` — flag before name, so the domain was named `-include_scope` and the real name lost | `RamPartitioned.upf:2` | phantom domain |
+| D9 | Plain Tcl (`set`, `source`, `foreach`, `[set_scope …]`) reported as "Unknown UPF command" | `FetchStage1.upf:6` | 5 |
+| D10 | `create_supply_net -domain` / `-reuse` / `-exclude` rejected as illegal | `Core_OOO_Flat.upf:240,272` | 543 |
+| D11 | `create_power_domain -scope` rejected as illegal | `BPU.upf:4` | 36 |
+| D12 | `set_isolation -diff_supply_only` rejected as illegal | `ActiveList.upf:55` | 71 |
+| D13 | `-control_port {ctrl sig}` kept as a brace literal; rules compared the pair against the design | `ActiveList.upf:44` and every switch | ~345 |
+| D14 | Relative `set_scope` assigned absolutely, dropping the parent scope prefix | `Core_OOO_Hier.upf` loads children into `/fs1`, `/exePipe2`, … | ~90 |
+| D15 | `UPF-081` compared `{sig sense}` against the design instead of the bare signal | demonstrated against a synthesized netlist | 1 rule now correct |
+
+### D7 — Backslash continuation inside braces
+
+Tcl treats a backslash before a newline as whitespace *everywhere*, including
+inside braces. The lexer preserved it inside `{}`, so
+
+```tcl
+connect_supply_net VSS -ports {VSS  \
+                            dom0/VSS  \
+                            dom1/VSS}
+```
+
+put a literal `\` into the port list, producing "unknown target `'\'`" once per
+continuation. AnyCore also emits `…  \ ` with a trailing space *after* the
+backslash, so the run of spaces between backslash and newline is consumed too.
+
+### D8 — `-include_scope` before the domain name
+
+`create_power_domain` took `args[0]` as the name. Real UPF puts flags first:
+
+```tcl
+create_power_domain -include_scope PD_RAM
+```
+
+so the domain was named `-include_scope`, `PD_RAM` was lost, and every later
+rule operated on a domain that does not exist. The name is now the first
+*positional* argument.
+
+### D13 — `{role signal}` pairs
+
+```tcl
+-control_port {ctrl alPartitionActive_i[2] }
+-on_state {on_s vin {ctrl}}
+```
+
+`ctrl` names the port *role*, not the signal. Keeping the pair intact made every
+control-signal lookup miss and produced findings quoting
+`'{ctrl alPartitionActive_i[2]      }'` as a signal name. The signal half is now
+extracted for lookup, and the role half is retained so a condition legitimately
+referencing the role (`{ctrl}`) is not flagged.
+
+### D14 — Relative scope composition
+
+A child loaded with `load_upf … -scope /fs1` that then runs `set_scope btb`
+should land in `/fs1/btb`. Assigning absolutely dropped the prefix, so supplies
+were keyed `btb/VDD` while the parent referenced `fs1/btb/VDD` — a guaranteed
+false positive on every hierarchically loaded block. A child *restating* its own
+scope (`set_scope core_a` in `core_a.upf`) remains idempotent, which the
+generator depends on.
 
 ## Part 2 — Real open-source projects (AnyCore, Tenstorrent)
 
@@ -328,9 +425,11 @@ pair and prefers the supply half, and it accepts both the `_supply` and
 `_power_net` spellings across switch, isolation, retention, and repeater
 strategies.
 
-**OPEN — P1 — `UPF-081` bare-signal lookup.** Split `{sig polarity}` before
-checking `design.has_signal()`. Demonstrated against a real netlist: `iso_en`
-exists but `{iso_en high}` does not, so a valid design is flagged.
+**DONE — P1 — `UPF-081` bare-signal lookup.** `-save_signal {ret_en high}` is
+now split into `save_signal_name` / `save_signal_sense`, and UPF-081 resolves the
+bare signal. Verified end-to-end against a Yosys-synthesized netlist in
+`tests/test_netlist_design_aware.py`, including a negative control proving a
+genuinely absent signal is still reported.
 
 **OPEN — P1 — `UPF-002` severity.** An option the engine has not implemented is
 `UNSUPPORTED` support, not `VALIDATED`. Tagging a known-unimplemented option
@@ -338,6 +437,15 @@ as `VALIDATED` is exactly the over-claim `CLAUDE.md` forbids. Suggested:
 `severity="warning"`, `support="UNSUPPORTED"` until the option is modeled.
 This matters more now that the grammar accepts the real option set: an
 accepted-but-unmodeled option is more likely to be hit than before.
+
+**OPEN — adjudicate the `ambiguous/needs-review` bucket.** 2236 of the 2268
+load-set findings are unclassified. They are not verified-correct findings; they
+are findings no predicate claimed. Each needs either a rule-level adjudication
+or a differential run against a reference tool.
+
+**OPEN — third external corpus.** One processor family (AnyCore) and one file
+(Tenstorrent) is a thin sample of production UPF style. The `--corpus` table in
+`scripts/validate_external.py` is designed to take more.
 
 **OPEN — P2 — `UPF-001` severity.** Unknown-command is right at *error* for
 genuinely unknown commands, but a command the standard defines and the engine
@@ -347,10 +455,11 @@ lacks should be `warning` + `UNSUPPORTED`, not an error.
 a reference `check_power_intent`) to settle severity calibration by comparison
 rather than by reasoning.
 
-**OPEN — re-measure the external projects.** The 0.0% shipped-corpus rate is
-measured; the AnyCore and Tenstorrent rates are not. Re-running them is the
-only way to confirm the grammar fixes generalise past the corpus, and it is
-the honest next step before claiming the false-positive problem is closed.
+**OPEN — re-measure the external projects.** **DONE (2026-10-02):** both
+corpora were located on this host and re-measured — AnyCore 65% → 1.4%,
+Tenstorrent 100% → 0.0%, determinism verified, sources unmodified. The residual
+work is the third item above: adjudicating the ambiguous bucket and widening
+the corpus sample.
 
 **P3 — conformance corpus.** Widen `tests/corpus/` beyond these three files
 toward public IEEE 1801 examples, and gate CI on the FP-rate from
