@@ -1,0 +1,17 @@
+# Top-level file loading the SAME child fragment into two distinct scopes.
+# Each load declares a PST named Core_OOO_PST. Before scoped-identity was
+# fixed, one silently overwrote the other, and the surviving PST's supply
+# columns were then judged against the other scope's declarations.
+#
+# Expected after the fix: both Core_OOO_PST definitions exist, one per scope,
+# and neither is a duplicate/cascade finding.
+
+upf_version 3.0
+set_design_top top
+
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+load_upf scoped_pst_child.upf -scope child_a
+load_upf scoped_pst_child.upf -scope child_b

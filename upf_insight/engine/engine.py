@@ -21,6 +21,8 @@ from .coverage.coverage import CoverageResult, analyze_coverage
 from ..model.builder import build_model
 from ..model.power_model import PowerIntentModel
 from ..preprocess.upf_preprocess import CommandRecord, preprocess_many
+import os
+from typing import Dict
 
 
 @dataclass
@@ -72,7 +74,15 @@ class ValidateResult:
 def _run(records: List[CommandRecord], paths: List[str],
          rules: Optional[List[str]] = None,
          netlist: Optional[str] = None) -> ValidateResult:
-    model: PowerIntentModel = build_model(records)
+    # Index records by file basename so `load_upf` can expand a child at the
+    # point it is loaded, rather than collapsing all loads of one file into a
+    # single scope. Built from the records already in hand: nothing is re-read,
+    # and a single-file run yields exactly one entry and behaves as before.
+    by_file: Dict[str, List[CommandRecord]] = {}
+    for rec in records:
+        if rec.file:
+            by_file.setdefault(os.path.basename(rec.file), []).append(rec)
+    model: PowerIntentModel = build_model(records, by_file=by_file)
     if netlist:
         from .design.netlist_parser import load_design
 

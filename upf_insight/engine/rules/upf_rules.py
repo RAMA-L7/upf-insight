@@ -7,6 +7,7 @@ them. Mirror of sdc-tools rule style: pure, evidence-first, no side effects.
 
 from __future__ import annotations
 
+import os
 from typing import Callable, Dict, List, Optional
 
 from ...model.power_model import PowerIntentModel
@@ -53,12 +54,48 @@ def _supply_lookup(model: PowerIntentModel, name: str,
         return "set", key
     if key in model.supply_ports:
         return "port", key
+    # A child-scoped name may be a *local* name that `load_upf ... -supply`
+    # mapped onto a parent-scope supply. Following that map is what makes
+    # `set_isolation -isolation_supply vdd_aon` inside a child resolve to the
+    # top-level net it was bound to, instead of reading as undefined.
+    if scope and scope not in (".", ""):
+        mapped = _mapped_parent_supply(model, name, scope)
+        if mapped is not None:
+            return _supply_lookup(model, mapped, None)
     # fall back to bare-name match
     for kind, table in (("net", model.supply_nets), ("set", model.supply_sets),
                         ("port", model.supply_ports)):
         if name in table:
             return kind, name
+    # Sibling/ancestor scope: in composed hierarchical UPF a child sees the
+    # supplies of the hierarchy around it, so a bare name declared elsewhere
+    # still resolves. Only reached when the name is absent from this scope and
+    # from the top, so it cannot silently shadow a nearer declaration. When
+    # several scopes declare the name, the ambiguity is itself the answer, so
+    # the match is refused rather than picked arbitrarily.
+    if name:
+        hits = {}
+        for kind, table in (("net", model.supply_nets),
+                            ("set", model.supply_sets),
+                            ("port", model.supply_ports)):
+            for k in table:
+                if k == name or k.endswith("/" + name):
+                    hits[k] = kind
+        if len(hits) == 1:
+            key, kind = next(iter(hits.items()))
+            return kind, key
     return None, None
+
+
+def _mapped_parent_supply(model: PowerIntentModel, name: str,
+                          scope: Optional[str]) -> Optional[str]:
+    """Parent-scope supply a child's local ``name`` was mapped onto, if any."""
+    if not scope or scope in (".", ""):
+        return None
+    for m in model.supply_maps:
+        if m.get("local_scope") == scope and m.get("local") == name:
+            return m.get("parent")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1358,8 +1395,11 @@ def _duplicate_definition(model: PowerIntentModel):
     return [
         Finding(rule="UPF-013", severity="error",
                 message=f"Duplicate definition of '{d['name']}' ({d['kind']}): "
-                        f"previously defined at line {d['old_line']}.",
-                line=d["new_line"], support="VALIDATED")
+                        f"previously defined at line {d['old_line']}"
+                        + (f" in {os.path.basename(d['file'])}"
+                           if d.get("file") else "") + ".",
+                line=d["new_line"], support="VALIDATED",
+                subject=d.get("scope") or "")
         for d in model.duplicate_definitions
     ]
 

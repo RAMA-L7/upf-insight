@@ -410,6 +410,94 @@ Neither mode is faithful on its own:
 
 Both are reported. Neither is claimed as the real flow.
 
+## Part 1e — Cross-file scoped-object identity (resolved)
+
+The collision described above was **not** a PST keying bug. Measurement showed
+two independent defects underneath it, both now fixed.
+
+**Defect 1 — `load_upf` did not expand per load site.** `build_model` walked a
+flat record list and tracked child scope in a dict keyed by *file basename*.
+A child loaded into N scopes was therefore built once and the other N-1
+instances were dropped. On AnyCore there are **75 load sites across 25 distinct
+targets** — `PipeLineReg.upf` alone is loaded 30 times under 30 distinct scopes
+(`PIPEREG[0].fs1fs2Reg` …). About 50 instances were silently discarded, which is
+what made identically named objects look like they were colliding.
+
+`load_upf` is now expanded **at the load site**, recursively, in the scope the
+child is loaded into. Expansion stays strictly ordered — `set_scope` remains
+positional and reordering the stream still changes the result (pinned by
+`test_reordering_set_scope_changes_the_model`).
+
+**Defect 2 — scope alone was not sufficient identity.** Seven of the nine
+`Core_OOO_PST` fragments never call `set_scope`; they are independent,
+complete files that all sit at top scope. No scope-based scheme can separate
+them, so identity is now `(scope, declaring file)`. The unqualified key is kept
+whenever it is unambiguous, so single-file behaviour is unchanged.
+
+A third, separate defect surfaced while measuring: `_detect_switch_output_overlap`
+grouped switches by **bare output net name**, so once expansion produced
+scope-distinct switches driving same-named `vout` nets, it reported 1585
+false conflicts (UPF-086 47 → 1632). It is now keyed by `(scope, net)`;
+UPF-086 moved 47 → 62, a genuine change.
+
+### Recovered model
+
+| | Before | After |
+|---|---|---|
+| Power domains | 123 | **278** |
+| Supply nets | 180 | **474** |
+| PSTs | 5 | **10** |
+| `Core_OOO_PST` instances | 1 | **8** (3,4,5,7,7,8,11,11 columns) |
+
+### Finding inventory, before → after (AnyCore, load-set)
+
+Total **1546 → 2663** (+1117). Per-file mode is **unchanged at 1337**, which is
+the check that single-file behaviour was not disturbed.
+
+| Rule | Before | After | Δ | Why |
+|---|---|---|---|---|
+| UPF-038 | 80 | 620 | **+540** | 30 recovered `PD_PIPEREG` instances, each reporting its unmodeled switch output. Real per-instance findings that were invisible before. |
+| UPF-071 | 80 | 192 | +112 | More strategy instances to check. |
+| UPF-022 | 45 | 154 | +109 | Unconnected nets in recovered child instances. |
+| UPF-020 | 28 | 104 | +76 | Domains with no primary supply, across recovered scopes. |
+| UPF-031 | 0 | 63 | +63 | The previously-collapsed `Core_OOO_PST` now includes `ActiveList.upf`'s table, exposing its known `-state` positional-parsing defect. It was masked by the overwrite. |
+| UPF-034 | 2 | 55 | +53 | Same `add_pst_state` root cause, per instance. |
+| UPF-010 | 148 | 200 | +52 | More references to resolve. |
+| UPF-042 | 8 | 55 | +47 | More PSTs to analyse. |
+| UPF-015 | 72 | 120 | +48 | More ports to match. |
+| UPF-021 | 12 | 39 | +27 | More domains. |
+| UPF-073 | 34 | 64 | +30 | More strategies. |
+| UPF-086 | 47 | 62 | +15 | Switch conflicts, now scope-qualified. |
+| UPF-014 | 46 | 52 | +6 | More use/definition pairs. |
+| UPF-016 | 141 | 147 | +6 | Boundary advisories per child instance. |
+| UPF-041 | 68 | 71 | +3 | More supplies. |
+| UPF-085 | 59 | 51 | −8 | Fewer spurious exact-duplicate strategies. |
+| UPF-043 | 3 | 0 | −3 | Resolved by correct scoping. |
+| UPF-025 | 52 | 28 | −24 | Fewer unreferenced states — the 8 distinct tables now each see their own. |
+| UPF-030 | 63 | 39 | −24 | Same reason. |
+| UPF-013 | 238 | 133 | **−105** | The biggest decrease. Cross-file same-name declarations are now recognised as **distinct objects** rather than duplicates of each other. |
+
+**No rule was muted, re-registered, or severity-tuned to move any of these
+numbers.** Every decrease above is explained by the model becoming more
+faithful; every increase is a per-instance finding that was previously
+suppressed by an object being dropped.
+
+### Grammar-layer false positives: 32 → 126
+
+This is **not** a new parsing defect. All 126 come from **8 distinct source
+lines**, each reported once per recovered scope instance (line 53 ×59,
+line 61 ×55). The underlying `add_pst_state` brace-group defect is unchanged;
+only its instance count is now honest. The *rate* moved 1.4% → 4.7% for the
+same reason the denominator grew.
+
+### What is still unfaithful
+
+Per-file mode still under-reports cross-file references, and load-set mode is
+still not the real hierarchical flow — it validates all 37 fragments as one
+flat load set, which is not how a design team would consume them. The scoped
+identity fix removes the *silent overwrite*; it does not make load-set mode a
+faithful reproduction of a real flow. That limitation is unchanged.
+
 ## Part 1d — Quality metrics (why there is no single accuracy number)
 
 `scripts/adjudicate.py` reports a metrics panel rather than one false-positive
@@ -417,26 +505,32 @@ rate, because a single rate conflates "could not read the file" with "read it
 and disagreed", and silently treats unadjudicated findings as either correct
 or incorrect. Measured on AnyCore (load-set, 37 files):
 
-| Metric | Value |
-|---|---|
-| Files processed | 37 |
-| Total findings | 1546 |
-| Parse-stage findings | **0** |
-| Grammar-layer FP | 32 (2.1%) |
-| Adjudicated | 799 (51.7%) |
-| **Unresolved** | **747 (48.3%)** |
-| Cascade / duplicate | 547 (35.4%) |
-| With file provenance | 27.4% |
-| Stage split | MODEL 641 · SEMANTIC 498 · DESIGN 375 · NORMALIZATION 32 |
-| Adjudicated classes | IMPLEMENTATION_DEFECT 345 · DUPLICATE_OR_CASCADE 238 · VALID_ADVISORY 216 |
+| Metric | Value | Was (pre-fix) |
+|---|---|---|
+| Files processed | 37 | 37 |
+| Total findings | 2663 | 1546 |
+| Parse-stage findings | **0** | 0 |
+| Grammar-layer FP | 126 (4.7%) | 32 (2.1%) |
+| Adjudicated | 1360 (51.1%) | 799 (51.7%) |
+| **Unresolved** | **1303 (48.9%)** | 747 (48.3%) |
+| Cascade / duplicate | 1377 (51.7%) | 547 (35.4%) |
+| With file provenance | 40.9% | 27.4% |
+| Adjudicated classes | IMPLEMENTATION_DEFECT 345 · DUPLICATE_OR_CASCADE 238 · VALID_ADVISORY 216 | same verdicts |
+
+The verdicts themselves are unchanged — the same rules were adjudicated the
+same way. What moved is how many findings each rule produces, for the reasons
+in Part 1e. Grammar-layer FP rose to 126 because 8 distinct defective source
+lines are now each reported once per recovered scope instance, not because a
+new parsing defect appeared.
 
 Three of these were invisible inside a single aggregate number:
 
-- **48.3% of findings are UNRESOLVED.** They are counted as neither true nor
+- **48.9% of findings are UNRESOLVED.** They are counted as neither true nor
   false. Any overall precision figure folding them in would be meaningless.
-- **35.4% share a subject** with another finding — cascades, not independent
-  evidence.
-- **27.4% carry file provenance.** That is the real cost of the
+- **51.7% share a subject** with another finding — cascades, not independent
+  evidence. This share rose with expansion: the same underlying condition is
+  now reported for each of its instances.
+- **40.9% carry file provenance.** That is the real cost of the
   `record_files` line-number-only limitation, now measured rather than
   described. It has since been improved to (file, line) resolution with
   subject-based fallback; see Part 1b.
