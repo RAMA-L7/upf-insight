@@ -50,20 +50,13 @@ from upf_insight.engine.rules.rules_registry import (     # noqa: E402
 )
 
 # ---------------------------------------------------------------------------
-# Corpora (same roots as validate_external.py; kept separate so this script has
-# no import-order coupling with the CLI harness).
+# Corpora. Definitions and canonical file ordering come from
+# ``scripts.corpus``, shared with validate_external.py, so the two harnesses
+# measure the same load set in the same order. This script still has no
+# import-order coupling with the CLI harness itself.
 # ---------------------------------------------------------------------------
 
-CORPORA = {
-    "anycore": {
-        "root": r"D:\upf-bench\anycore-riscv-src",
-        "glob": "power_spec/*.upf",
-    },
-    "tenstorrent": {
-        "root": r"D:\upf-bench\tt",
-        "glob": "*.upf",
-    },
-}
+from scripts.corpus import CORPORA, corpus_paths  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Validation classes (Step 6). Every adjudicated finding gets exactly one.
@@ -212,15 +205,11 @@ def build_inventory(corpus: str, netlist: Optional[str] = None,
     file alone. The two modes produce different models and therefore different
     finding counts; both are reportable and the mode is recorded in the output.
     """
-    spec = CORPORA[corpus]
-    root = Path(spec["root"])
-    if not root.is_dir():
-        return {"corpus": corpus, "available": False,
-                "reason": "root %s missing" % root}
-    files = sorted(str(p) for p in root.glob(spec["glob"]))
-    if not files:
-        return {"corpus": corpus, "available": False,
-                "reason": "no files matched %s" % spec["glob"]}
+    try:
+        # Canonical order, shared with validate_external.py.
+        files = corpus_paths(corpus)
+    except (FileNotFoundError, KeyError) as exc:
+        return {"corpus": corpus, "available": False, "reason": str(exc)}
 
     mode = "load-set" if load_set else "per-file"
     if load_set:

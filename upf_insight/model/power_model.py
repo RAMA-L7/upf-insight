@@ -15,6 +15,7 @@ Entities are deliberately plain data objects; rules live in the checker.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -118,6 +119,11 @@ class Pst:
     states: List[PowerState] = field(default_factory=list)
     transitions: List[tuple] = field(default_factory=list)  # (src, dst)
     declared_line: Optional[int] = None
+    #: File this table was declared in. Several independent fragments each
+    #: declare a complete, scope-less table of the same name; the declaring
+    #: file is what tells those objects apart, matching the `declared_file`
+    #: convention already carried by the strategy classes.
+    declared_file: Optional[str] = None
     #: Supply names from ``create_pst -supplies``, in declaration order.
     #: IEEE 1801 maps ``add_pst_state -state`` entries *positionally* onto this
     #: list, so it must be retained — without it the positional form is
@@ -131,6 +137,7 @@ class Pst:
             "states": [s.to_dict() for s in self.states],
             "transitions": [list(t) for t in self.transitions],
             "declared_line": self.declared_line,
+            "declared_file": self.declared_file,
             "supply_list": list(self.supply_list),
         }
 
@@ -263,12 +270,82 @@ class PowerIntentModel:
     scope_changes: List[dict] = field(default_factory=list)      # {scope, line}
     design: Optional[object] = None  # DesignContext (netlist snapshot), if supplied
 
-    def scope_key(self, name: str, scope: Optional[str] = None) -> str:
-        """Fully-qualified identifier: ``<scope>/<name>``."""
+    def scope_key(self, name: str, scope: Optional[str] = None,
+                  origin: Optional[str] = None) -> str:
+        """Fully-qualified identifier: ``<scope>/<name>``, optionally origin-qualified.
+
+        ``origin`` names the file a declaration came from. It is needed because
+        scope alone does not identify an object in a corpus of *independent
+        fragments*: several files may each declare a complete, scope-less
+        definition of the same name (``Core_OOO_PST`` is declared by nine AnyCore
+        files with nine different supply lists, none of which call ``set_scope``).
+        Those are distinct objects, not redefinitions of one object.
+
+        When ``origin`` is None the result is exactly what it always was, so
+        single-file behaviour is unchanged.
+        """
         s = (scope or self.current_scope).rstrip("/")
-        if s in (".", ""):
+        base = name if s in (".", "") else f"{s}/{name}"
+        if origin:
+            base = f"{base}@{os.path.basename(str(origin))}"
+        return base
+
+    def store(self, table: Dict[str, object], name: str, obj: object,
+              scope: Optional[str] = None, origin: Optional[str] = None) -> str:
+        """Insert ``obj`` under its fully-qualified identity, and return that key.
+
+        Identity is ``<scope>/<name>`` — sufficient when the name is unique in
+        its scope. When a *different file* has already claimed that same name
+        in the same scope, scope alone cannot tell the two declarations apart,
+        so the declaring file is appended to disambiguate.
+
+        This happens in real corpora: nine AnyCore fragments each declare a
+        complete, scope-less ``Core_OOO_PST`` with nine different supply lists.
+        Those are nine distinct objects, not nine redefinitions of one, and
+        collapsing them loses eight.
+
+        The unqualified key is kept whenever it is unambiguous, so a name that
+        appears once is stored exactly as before and single-file behaviour is
+        unchanged. A redefinition *within* the same file keeps the bare key, so
+        it is still reported as a duplicate rather than silently split.
+        """
+        key = self.scope_key(name, scope)
+        if key in table and origin:
+            existing = table.get(key)
+            existing_origin = getattr(existing, "declared_file", None)
+            if existing_origin and existing_origin != origin:
+                key = self.scope_key(name, scope, origin)
+        table[key] = obj
+        return key
+
+    def resolve(self, name: str, table: Dict[str, object],
+                scope: Optional[str] = None,
+                origin: Optional[str] = None) -> Optional[str]:
+        """Find the key under which ``name`` was declared, widening in order.
+
+        Exact ``(scope, origin)`` first, then the same scope from any origin,
+        then a bare-name match for objects declared at top scope. Returns the
+        matching key, or None. The widening order matters: a reference inside a
+        child scope must bind to that child's object before any top-scope
+        namesake, and a reference from a top-level fragment must not silently
+        bind to a child-scoped object.
+        """
+        if origin:
+            k = self.scope_key(name, scope, origin)
+            if k in table:
+                return k
+        if scope and scope not in (".", ""):
+            k = self.scope_key(name, scope)
+            if k in table:
+                return k
+            # Same scope, different origin: a fragment-scoped declaration.
+            prefix = self.scope_key(name, scope) + "@"
+            for existing in table:
+                if existing.startswith(prefix):
+                    return existing
+        if name in table:
             return name
-        return f"{s}/{name}"
+        return None
 
     def to_dict(self) -> dict:
         """Serialize the model for `upf-insight model` JSON output."""

@@ -285,24 +285,32 @@ def _retention_overlaps(pa: Dict[str, Any], pb: Dict[str, Any]) -> bool:
 
 
 def _detect_switch_output_overlap(model: PowerIntentModel) -> List[Interaction]:
-    by_net: Dict[str, List[PowerSwitch]] = {}
+    # Keyed by (scope, output_supply), not by the bare net name. Two switches
+    # in *different* scopes may each drive a same-named local net without
+    # conflicting — that is the normal shape of composed hierarchical UPF,
+    # where every child declares its own `vout`. Grouping them under the bare
+    # name made every such pair look like a conflict.
+    by_net: Dict[Tuple[str, str], List[PowerSwitch]] = {}
     for sw in model.switches.values():
         if sw.output_supply:
-            by_net.setdefault(sw.output_supply, []).append(sw)
+            by_net.setdefault(
+                (getattr(sw, "scope", ".") or ".", sw.output_supply), []
+            ).append(sw)
     interactions: List[Interaction] = []
-    for net in sorted(by_net):
-        drivers = sorted(by_net[net], key=lambda s: (s.name, s.scope))
+    for scope, net in sorted(by_net):
+        drivers = sorted(by_net[(scope, net)], key=lambda s: (s.name, s.scope))
         for i in range(len(drivers)):
             for j in range(i + 1, len(drivers)):
                 a, b = drivers[i], drivers[j]
                 message = (
                     f"Conflicting power switches: '{a.name}' and '{b.name}' both "
-                    f"drive output supply net '{net}'."
+                    f"drive output supply net '{net}' in scope '{scope}'."
                 )
                 evidence = {
                     "switch_a": a.name,
                     "switch_b": b.name,
                     "output_supply": net,
+                    "scope": scope,
                     "line": min(
                         d for d in (a.declared_line, b.declared_line) if d is not None
                     )
@@ -313,11 +321,12 @@ def _detect_switch_output_overlap(model: PowerIntentModel) -> List[Interaction]:
                     Interaction(
                         kind=CONFLICT,
                         code=CODE_CONFLICT,
-                        subject=net,
+                        subject=model.scope_key(net, scope),
                         message=message,
                         evidence=evidence,
                         finding=_make_finding(
-                            CONFLICT, CODE_CONFLICT, net, message, evidence
+                            CONFLICT, CODE_CONFLICT,
+                            model.scope_key(net, scope), message, evidence
                         ),
                     )
                 )

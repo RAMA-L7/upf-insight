@@ -44,26 +44,17 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
-#: Known external corpora. ``root`` is a local checkout; ``repo`` records
-#: provenance so a reader can re-acquire the exact revision independently.
-CORPORA: Dict[str, dict] = {
-    "anycore": {
-        "root": r"D:\upf-bench\anycore-riscv-src",
-        "glob": "power_spec/*.upf",
-        "repo": "https://github.com/anycore/anycore-riscv-src",
-        "commit": "419cc6cd1e709018de91b32285e79441c1c8c560",
-        "license": "NCSU copyright (see LICENSE)",
-        "baseline": {"files": 37, "findings": 4012, "fp_rate": 65.0},
-    },
-    "tenstorrent": {
-        "root": r"D:\upf-bench\tt",
-        "glob": "*.upf",
-        "repo": "https://github.com/tenstorrent/tt-metal (local copy)",
-        "commit": "local snapshot",
-        "license": "Apache-2.0 (SPDX header in file)",
-        "baseline": {"files": 1, "findings": 1, "fp_rate": 100.0},
-    },
-}
+#: Repo root, so ``scripts.corpus`` is importable when this file is run
+#: directly as ``python scripts/validate_external.py``.
+_ROOT = str(Path(__file__).resolve().parent.parent)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+#: Corpus definitions and canonical file ordering live in ``scripts/corpus.py``
+#: so that this harness and ``adjudicate.py`` enumerate the same load set in the
+#: same order. Re-exported here because callers already import them from this
+#: module by name.
+from scripts.corpus import CORPORA, corpus_paths, enumerate_corpus  # noqa: F401,E402
 
 # --------------------------------------------------------------------------
 # Classification vocabulary.
@@ -205,15 +196,17 @@ def run_one(path: Path) -> dict:
 
 
 def collect(name: str) -> tuple:
-    """Return (files, provenance-or-reason). Read-only."""
-    spec = CORPORA[name]
-    root = Path(spec["root"])
-    if not root.is_dir():
-        return [], ("corpus root %s does not exist on this host" % root)
-    files = sorted(root.glob(spec["glob"]))
-    if not files:
-        return [], ("no files matched %s under %s" % (spec["glob"], root))
-    return files, spec
+    """Return (files, provenance-or-reason). Read-only.
+
+    Thin wrapper over ``scripts.corpus.enumerate_corpus`` so that this harness
+    and ``adjudicate.py`` cannot drift on which files are in the load set or on
+    their order. An absent corpus is still reported rather than raised, matching
+    the historical contract.
+    """
+    try:
+        return enumerate_corpus(name)
+    except (FileNotFoundError, KeyError) as exc:
+        return [], str(exc)
 
 
 def run_load_set(files: List[Path]) -> dict:

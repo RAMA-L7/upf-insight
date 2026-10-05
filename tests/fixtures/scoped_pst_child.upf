@@ -1,0 +1,22 @@
+# Child fragment. Loaded twice by scoped_pst_parent.upf under two different
+# scopes. It declares a PST named Core_OOO_PST with a 3-column supply list and
+# a domain named PD_CHILD.
+#
+# Both loads must survive independently in the model: the two Core_OOO_PST
+# definitions are legal because they live in different scopes.
+
+create_power_domain PD_CHILD -primary_supply_set vss
+create_supply_net VDD_SW
+create_supply_net VSS_SW
+create_supply_port vss -direction in
+create_supply_net vss -resolve port
+connect_supply_net vss -ports vss
+
+add_port_state VDD_SW -state {ON 1.0}
+add_port_state VSS_SW -state {ON 0.0}
+
+# 3-column PST: VDD_SW, VSS_SW, and the child's own domain supply.
+create_pst Core_OOO_PST -supplies {VDD_SW VSS_SW vss}
+add_pst_state PRIMARY -pst Core_OOO_PST -state {ON ON ON}
+
+set_domain_supply_net PD_CHILD -primary_power_net VDD_SW -primary_ground_net VSS_SW

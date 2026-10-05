@@ -182,17 +182,38 @@ _DEPRECATED_FORMS = {
 }
 
 
-def _track_definition(model: PowerIntentModel, kind: str, name: str, line: int) -> None:
+def _track_definition(model: PowerIntentModel, kind: str, name: str, line: int,
+                      origin: Optional[str] = None) -> None:
+    """Record a declaration, flagging genuine redefinitions.
+
+    Two declarations are a redefinition only when they describe the *same*
+    object: same name, same scope, and same declaring file. Two files each
+    declaring a scope-less object of the same name are declaring two distinct
+    objects — the pattern real fragment corpora use — so they are tracked
+    separately instead of being reported as one overwriting the other.
+    """
     key = model.scope_key(name)
     prev = model.definitions.get(key)
     if prev is not None and prev["kind"] == kind:
+        prev_origin = prev.get("file")
+        if origin and prev_origin and prev_origin != origin:
+            # Distinct declaration site: a separate object, not a redefinition.
+            qualified = model.scope_key(name, None, origin)
+            model.definitions[qualified] = {"kind": kind, "line": line,
+                                            "file": origin}
+            return
         model.duplicate_definitions.append({
             "name": name, "kind": kind,
             "old_line": prev["line"], "new_line": line,
+            # Scope and declaring file, so a duplicate in one scope can be told
+            # apart from an identically named object in another. The bare name
+            # alone made two unrelated findings indistinguishable.
+            "scope": model.current_scope,
+            "file": origin,
         })
         return
     if prev is None:
-        model.definitions[key] = {"kind": kind, "line": line}
+        model.definitions[key] = {"kind": kind, "line": line, "file": origin}
 
 
 def _track_reference(model: PowerIntentModel, kind: str, name: str, line: int) -> None:
@@ -249,7 +270,8 @@ def _tokenize(record: CommandRecord) -> List[str]:
     return tokens
 
 
-def build_model(records: List[CommandRecord]) -> PowerIntentModel:
+def build_model(records: List[CommandRecord],
+                by_file: Optional[Dict[str, List[CommandRecord]]] = None) -> PowerIntentModel:
     """Build a power-intent model from preprocessed command records.
 
     Scope is per-file state. A file that never issues ``set_scope`` starts at
@@ -258,17 +280,94 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
     lets a child inherit the scope it is loaded into instead of repeating
     ``set_scope``. Without this, the model depended on the order files were
     listed on the command line.
+
+    ``load_upf`` is expanded **at the load site**: the child is processed
+    inline, in the scope it is loaded into. This matters because the same child
+    is routinely loaded into *many* scopes — AnyCore loads ``PipeLineReg.upf``
+    thirty times under thirty distinct scopes, all of them real. A previous
+    implementation kept one entry per child basename, so only the last load
+    survived and the rest were silently dropped, which is what made identically
+    named objects appear to "collide". Expansion is still strictly ordered:
+    ``set_scope`` stays positional and reordering the stream still changes the
+    result.
+
+    ``by_file`` maps a file basename to its records, enabling expansion. It is
+    a parameter rather than an internal lookup so the caller controls which
+    files are visible; when omitted, ``load_upf`` records the event and the
+    child contributes nothing, preserving the historical behaviour exactly.
     """
     model = PowerIntentModel()
-    # child-file basename -> scope established by a prior `load_upf -scope`.
-    file_scope: dict = {}
+    # (basename, scope) pairs currently being expanded, for cycle detection.
+    # `load_upf` nests in real corpora, so recursion is expected and must be
+    # bounded rather than assumed absent.
+    active_loads: set = set()
+    # Files reached by `load_upf` from an entry file are *included* by their
+    # parent, not validated in their own right. Walking them again as
+    # top-level entries would process the same declarations twice and register
+    # them as duplicates of themselves. Entry files are therefore identified
+    # by their position in the supplied order, and a file that is pulled in by
+    # a parent is walked only from the parent's load site.
+    included: Dict[str, List[str]] = {}
+    _mark_included(records, by_file or {}, included)
+    entry_files = _entry_files(records, included)
+    _walk(model, records, by_file or {}, ".", active_loads, entry_files)
+    _apply_control_bindings(model)
+    return model
+
+
+def _mark_included(records: List[CommandRecord],
+                   by_file: Dict[str, List[CommandRecord]],
+                   included: Dict[str, List[str]]) -> None:
+    """Record, per file, the basenames it pulls in via ``load_upf``.
+
+    Resolved by walking each file's records once rather than by scanning for
+    the `load_upf` command, so this does not depend on dispatch order.
+    """
+    for rec in records:
+        toks = (rec.text or "").split()
+        if len(toks) >= 2 and toks[0].lower() == "load_upf":
+            included.setdefault(os.path.basename(rec.file or ""), []).append(
+                os.path.basename(toks[1]))
+
+
+def _entry_files(records: List[CommandRecord],
+                 included: Dict[str, List[str]]) -> set:
+    """The files that are entry points rather than another file's include."""
+    referenced = {t for targets in included.values() for t in targets}
+    out = set()
+    for rec in records:
+        base = os.path.basename(rec.file or "")
+        if base and base not in referenced:
+            out.add(base)
+    return out
+
+
+def _walk(model: PowerIntentModel, records: List[CommandRecord],
+          by_file: Dict[str, List[CommandRecord]], entry_scope: str,
+          active_loads: set, entry_files: set) -> None:
+    """Process ``records`` sequentially, expanding ``load_upf`` at each site.
+
+    Recurses into a child file rather than reordering the stream, so the model
+    is built in exactly the sequence the UPF describes. Only entry files are
+    walked at this level; a file included by a parent is walked from the
+    parent's load site, in that parent's scope.
+    """
     last_file: Optional[str] = None
     # Name of the most recent create_pst — the "current table" context that
     # add_state_transition applies to (IEEE 1801 gives it no -pst option).
     last_pst_name: Optional[str] = None
+    first = True
     for rec in records:
+        if entry_files and os.path.basename(rec.file or "") not in entry_files:
+            # Top level only (entry_files is empty once we are inside a child):
+            # a file included by a parent is walked at the parent's load site,
+            # so walking it here too would declare everything twice.
+            continue
         if rec.file != last_file:
-            model.current_scope = file_scope.get(os.path.basename(rec.file or ""), ".")
+            # A file enters in the scope it was loaded into; a top-level file
+            # that was never loaded enters at the scope its caller established.
+            model.current_scope = entry_scope if first else "."
+            first = False
             last_file = rec.file
             last_pst_name = None
         model.commands_seen += 1
@@ -300,13 +399,32 @@ def build_model(records: List[CommandRecord]) -> PowerIntentModel:
         _syntax_check(model, cmd, tokens, rec)
         seen_loads = len(model.load_upf_events)
         last_pst_name = _dispatch(model, cmd, args, rec, last_pst_name)
-        # `load_upf` scopes the child: record basename -> child scope so the
-        # boundary above enters that file in the right scope.
+        # `load_upf` pulls the child in *here*: expand it at this site, in the
+        # scope it is loaded into, rather than remembering one scope per file.
         for ev in model.load_upf_events[seen_loads:]:
-            if ev.get("loaded"):
-                file_scope[os.path.basename(ev["loaded"])] = ev.get("child_scope") or "."
-    _apply_control_bindings(model)
-    return model
+            loaded = ev.get("loaded")
+            if not loaded:
+                continue
+            base = os.path.basename(loaded)
+            child_records = by_file.get(base)
+            if not child_records:
+                # Referenced but not supplied (real corpora reference files
+                # outside the validated set, e.g. AnyCore's Dispatch.upf). The
+                # event is already recorded, so this is visible, not silent.
+                continue
+            child_scope = ev.get("child_scope") or "."
+            marker = (base, child_scope)
+            if marker in active_loads:
+                # Cycle: this file is already being expanded into this scope.
+                continue
+            saved = model.current_scope
+            active_loads.add(marker)
+            try:
+                _walk(model, child_records, by_file, child_scope,
+                      active_loads, set())
+            finally:
+                active_loads.discard(marker)
+                model.current_scope = saved
 
 
 def _apply_control_bindings(model: PowerIntentModel) -> None:
@@ -578,23 +696,23 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
                 if len(pair) == 2:
                     dom.primary_supply_sets[pair[0]] = pair[1]
                     _track_reference(model, "supply", pair[1], line)
-        _track_definition(model, "domain", name, line)
-        model.domains[model.scope_key(name, scope)] = dom
+        _track_definition(model, "domain", name, line, origin=rec.file)
+        model.store(model.domains, name, dom, scope, rec.file)
     elif cmd == "create_supply_net":
         name = args[0] if args else "?"
         net = SupplyNet(name=name, scope=model.current_scope, declared_line=line,
                         declared_file=rec.file)
         net.connected_to = []
-        _track_definition(model, "net", name, line)
-        model.supply_nets[model.scope_key(name, model.current_scope)] = net
+        _track_definition(model, "net", name, line, origin=rec.file)
+        model.store(model.supply_nets, name, net, model.current_scope, rec.file)
     elif cmd == "create_supply_port":
         name = args[0] if args else "?"
         direction = _get_opt(args, "-direction", "inout")
-        _track_definition(model, "port", name, line)
-        model.supply_ports[model.scope_key(name, model.current_scope)] = SupplyPort(
-            name=name, scope=model.current_scope, direction=direction, declared_line=line,
-            declared_file=rec.file
-        )
+        _track_definition(model, "port", name, line, origin=rec.file)
+        model.store(model.supply_ports, name, SupplyPort(
+            name=name, scope=model.current_scope, direction=direction,
+            declared_line=line, declared_file=rec.file
+        ), model.current_scope, rec.file)
     elif cmd == "create_supply_set":
         name = args[0] if args else "?"
         funcs: dict = {}
@@ -609,11 +727,11 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             if val:
                 funcs[opt.lstrip("-")] = val
                 _track_reference(model, "supply", val, line)
-        _track_definition(model, "set", name, line)
-        model.supply_sets[model.scope_key(name, model.current_scope)] = SupplySet(
-            name=name, scope=model.current_scope, functions=funcs, declared_line=line,
-            declared_file=rec.file
-        )
+        _track_definition(model, "set", name, line, origin=rec.file)
+        model.store(model.supply_sets, name, SupplySet(
+            name=name, scope=model.current_scope, functions=funcs,
+            declared_line=line, declared_file=rec.file
+        ), model.current_scope, rec.file)
     elif cmd == "connect_supply_net":
         net = args[0] if args else None
         targets = _split_opt(args, "-ports") or _split_opt(args, "-nets")
@@ -664,14 +782,15 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
         if out_supply:
             _track_reference(model, "supply", out_supply, line)
         _track_definition(model, "switch", name, line)
-        model.switches[model.scope_key(name, model.current_scope)] = switch
+        model.store(model.switches, name, switch, model.current_scope, rec.file)
     elif cmd == "create_pst":
         name = args[0] if args else "?"
-        _track_definition(model, "pst", name, line)
-        model.psts[model.scope_key(name, model.current_scope)] = Pst(
+        _track_definition(model, "pst", name, line, origin=rec.file)
+        model.store(model.psts, name, Pst(
             name=name, scope=model.current_scope, declared_line=line,
+            declared_file=rec.file,
             supply_list=_split_opt(args, "-supplies"),
-        )
+        ), model.current_scope, rec.file)
         last_pst_name = name
     elif cmd == "add_pst_state":
         pst_name = _get_opt(args, "-pst")

@@ -340,29 +340,48 @@ Cascade removed: UPF-031 48→0, UPF-025 177→52, UPF-030 177→63, UPF-034 16�
 
 | | Before adjudication | After |
 |---|---|---|
-| AnyCore load-set findings | 2296 | **1651** |
+| AnyCore load-set findings | 2296 | **1546** |
 | UPF-087 | 309 | **0** |
 | UPF-031 | 48 | **0** |
 | Grammar-layer FP count | 32 | 32 (unchanged) |
-| Grammar-layer FP *rate* | 1.4% | 1.9% |
+| Grammar-layer FP *rate* | 1.4% | 2.1% |
 
 The rate moved up only because the denominator shrank; the absolute count of
 grammar-layer false positives is unchanged. This is also why no single
 "accuracy" figure is quoted — see the confidence limitations below.
 
-### A measurement caveat: load order is semantically significant
+### Load order is semantically significant — and is now pinned
 
-The same corpus validated as one load set yields **1651 or 1686 findings**
-depending on how the file list was enumerated. `sorted()` on paths and
-`Path.glob` disagree on collation (`RamPartitioned_FreePDK.upf` sorts before
-`RamPartitionedAL.upf` under `Path.glob`, after it under `sorted()`), and
-because `set_scope` / `load_upf` are positional, order legitimately changes the
-model — UPF-038 (185 vs 220) and UPF-041 (61 vs 68) are the rules that move.
+`set_scope` / `load_upf` are positional, so which file is read first decides
+which same-named object wins. Enumeration order is therefore part of the
+measurement, not an incidental detail.
 
-Both orders are individually deterministic and repeatable. They simply measure
-different load orders. **When quoting a load-set figure, state the enumeration
-method.** `scripts/validate_external.py` and `scripts/adjudicate.py` currently
-differ here; they should agree on one canonical order.
+An earlier revision of this report claimed the corpus "yields 1651 or 1686
+findings depending on how the file list was enumerated". **That was measured
+against a superseded engine state and is no longer reproducible.** Re-measured
+on the current engine (v0.3.0-validation.3):
+
+| Enumeration | AnyCore load-set findings |
+|---|---|
+| `sorted(Path)` — case-folded on Windows | 1546 |
+| `sorted(str)` — byte-wise | 1546 |
+| `Path.glob` unsorted | 1546 |
+| `sorted(name)`, `sorted(casefold)`, `sorted(lower)` | 1546 |
+| reversed order (control) | 1696 |
+
+The `sorted(Path)` vs `sorted(str)` divergence is real — those two collations
+disagree on `RamPartitioned_FreePDK.upf` vs `RamPartitionedAL.upf` at index 31
+— but on this corpus it does **not** move the finding count. Order only starts
+to matter when the sequence is genuinely rearranged (the reversed control
+differs by 150). The two harnesses' numbers differed by mode, not order:
+`validate_external.py` defaults to per-file (1337) while `adjudicate.py`
+defaults to load-set (1546).
+
+`scripts/corpus.py` now owns corpus definitions and enumeration for both
+harnesses, with the collation pinned to a case-sensitive sort on the POSIX-style
+relative path — platform-independent, and not at the mercy of the host
+filesystem's collation rules. Both tools report **1546** for AnyCore and **0**
+for Tenstorrent. `tests/test_corpus_enumeration.py` pins the invariant.
 
 ### A stronger caveat: load-set mode is not a faithful flow for this corpus
 
@@ -391,6 +410,121 @@ Neither mode is faithful on its own:
 
 Both are reported. Neither is claimed as the real flow.
 
+## Part 1e — Cross-file scoped-object identity (resolved)
+
+The collision described above was **not** a PST keying bug. Measurement showed
+two independent defects underneath it, both now fixed.
+
+**Defect 1 — `load_upf` did not expand per load site.** `build_model` walked a
+flat record list and tracked child scope in a dict keyed by *file basename*.
+A child loaded into N scopes was therefore built once and the other N-1
+instances were dropped. On AnyCore there are **75 load sites across 25 distinct
+targets** — `PipeLineReg.upf` alone is loaded 30 times under 30 distinct scopes
+(`PIPEREG[0].fs1fs2Reg` …). About 50 instances were silently discarded, which is
+what made identically named objects look like they were colliding.
+
+`load_upf` is now expanded **at the load site**, recursively, in the scope the
+child is loaded into. Expansion stays strictly ordered — `set_scope` remains
+positional and reordering the stream still changes the result (pinned by
+`test_reordering_set_scope_changes_the_model`).
+
+**Defect 2 — scope alone was not sufficient identity.** Seven of the nine
+`Core_OOO_PST` fragments never call `set_scope`; they are independent,
+complete files that all sit at top scope. No scope-based scheme can separate
+them, so identity is now `(scope, declaring file)`. The unqualified key is kept
+whenever it is unambiguous, so single-file behaviour is unchanged.
+
+A third, separate defect surfaced while measuring: `_detect_switch_output_overlap`
+grouped switches by **bare output net name**, so once expansion produced
+scope-distinct switches driving same-named `vout` nets, it reported 1585
+false conflicts (UPF-086 47 → 1632). It is now keyed by `(scope, net)`;
+UPF-086 moved 47 → 62, a genuine change.
+
+### Recovered model
+
+| | Before | After |
+|---|---|---|
+| Power domains | 123 | **278** |
+| Supply nets | 180 | **474** |
+| PSTs | 5 | **10** |
+| `Core_OOO_PST` instances | 1 | **8** (3,4,5,7,7,8,11,11 columns) |
+
+### Finding inventory, before → after (AnyCore, load-set)
+
+Total **1546 → 2663**. **These two numbers are not directly comparable as a
+quality metric**, and the increase is not a regression:
+
+```text
+old model  → incomplete representation  → 1546 findings
+new model  → expanded load sites       → 2663 findings
+                                          (previously invisible instances
+                                           are now validated)
+```
+
+The old model discarded roughly 50 child instances, so it was never in a
+position to report findings that live inside them. The new model validates
+substantially more of the actual UPF structure, which necessarily surfaces
+more findings. The meaningful per-file comparison is unchanged: **1337 →
+1337**, which is the check that single-file behaviour was not disturbed.
+
+| Rule | Before | After | Δ | Why |
+|---|---|---|---|---|
+| UPF-038 | 80 | 620 | **+540** | 30 recovered `PD_PIPEREG` instances, each reporting its unmodeled switch output. Real per-instance findings that were invisible before. |
+| UPF-071 | 80 | 192 | +112 | More strategy instances to check. |
+| UPF-022 | 45 | 154 | +109 | Unconnected nets in recovered child instances. |
+| UPF-020 | 28 | 104 | +76 | Domains with no primary supply, across recovered scopes. |
+| UPF-031 | 0 | 63 | +63 | The previously-collapsed `Core_OOO_PST` now includes `ActiveList.upf`'s table, exposing its known `-state` positional-parsing defect. It was masked by the overwrite. |
+| UPF-034 | 2 | 55 | +53 | Same `add_pst_state` root cause, per instance. |
+| UPF-010 | 148 | 200 | +52 | More references to resolve. |
+| UPF-042 | 8 | 55 | +47 | More PSTs to analyse. |
+| UPF-015 | 72 | 120 | +48 | More ports to match. |
+| UPF-021 | 12 | 39 | +27 | More domains. |
+| UPF-073 | 34 | 64 | +30 | More strategies. |
+| UPF-086 | 47 | 62 | +15 | Switch conflicts, now scope-qualified. |
+| UPF-014 | 46 | 52 | +6 | More use/definition pairs. |
+| UPF-016 | 141 | 147 | +6 | Boundary advisories per child instance. |
+| UPF-041 | 68 | 71 | +3 | More supplies. |
+| UPF-085 | 59 | 51 | −8 | Fewer spurious exact-duplicate strategies. |
+| UPF-043 | 3 | 0 | −3 | Resolved by correct scoping. |
+| UPF-025 | 52 | 28 | −24 | Fewer unreferenced states — the 8 distinct tables now each see their own. |
+| UPF-030 | 63 | 39 | −24 | Same reason. |
+| UPF-013 | 238 | 133 | **−105** | The biggest decrease. Cross-file same-name declarations are now recognised as **distinct objects** rather than duplicates of each other. |
+
+**No rule was muted, re-registered, or severity-tuned to move any of these
+numbers.** Every decrease above is explained by the model becoming more
+faithful; every increase is a per-instance finding that was previously
+suppressed by an object being dropped.
+
+**None of these findings should be assumed correct merely because they appeared
+after model expansion.** UPF-038's 620 is the clearest case: it grew because 30
+recovered `PD_PIPEREG` instances each began reporting an unmodeled switch
+output. Whether those are (A) real per-instance violations, (B) valid
+advisories, (C) artifacts of the newly recovered model, (D) another modelling
+defect, or (E) cascades is **unadjudicated**. The same caution applies to the
+1303 unresolved findings. Establishing which is the next milestone — it is no
+longer parser correctness.
+
+### Grammar-layer false positives: 32 → 126 occurrences
+
+After cross-file expansion, known grammar-layer false-positive **occurrences**
+increased from 32 to 126 because previously discarded UPF instances are now
+validated. The underlying parsing defects are unchanged. The 126 occurrences
+originate from **8 source lines** across recovered scope instances (line 53
+reported 59 times, line 61 reported 55 times).
+
+The grammar-FP *rate* therefore moved from 1.4% to 4.7%. That figure should
+not be quoted as a regression in parser quality: the denominator grew because
+the model now represents more of the project, and the defect count behind the
+occurrences is the same set of 8 lines.
+
+### What is still unfaithful
+
+Per-file mode still under-reports cross-file references, and load-set mode is
+still not the real hierarchical flow — it validates all 37 fragments as one
+flat load set, which is not how a design team would consume them. The scoped
+identity fix removes the *silent overwrite*; it does not make load-set mode a
+faithful reproduction of a real flow. That limitation is unchanged.
+
 ## Part 1d — Quality metrics (why there is no single accuracy number)
 
 `scripts/adjudicate.py` reports a metrics panel rather than one false-positive
@@ -398,26 +532,32 @@ rate, because a single rate conflates "could not read the file" with "read it
 and disagreed", and silently treats unadjudicated findings as either correct
 or incorrect. Measured on AnyCore (load-set, 37 files):
 
-| Metric | Value |
-|---|---|
-| Files processed | 37 |
-| Total findings | 1546 |
-| Parse-stage findings | **0** |
-| Grammar-layer FP | 32 (2.1%) |
-| Adjudicated | 799 (51.7%) |
-| **Unresolved** | **747 (48.3%)** |
-| Cascade / duplicate | 547 (35.4%) |
-| With file provenance | 27.4% |
-| Stage split | MODEL 641 · SEMANTIC 498 · DESIGN 375 · NORMALIZATION 32 |
-| Adjudicated classes | IMPLEMENTATION_DEFECT 345 · DUPLICATE_OR_CASCADE 238 · VALID_ADVISORY 216 |
+| Metric | Value | Was (pre-fix) |
+|---|---|---|
+| Files processed | 37 | 37 |
+| Total findings | 2663 | 1546 |
+| Parse-stage findings | **0** | 0 |
+| Grammar-layer FP | 126 (4.7%) | 32 (2.1%) |
+| Adjudicated | 1360 (51.1%) | 799 (51.7%) |
+| **Unresolved** | **1303 (48.9%)** | 747 (48.3%) |
+| Cascade / duplicate | 1377 (51.7%) | 547 (35.4%) |
+| With file provenance | 40.9% | 27.4% |
+| Adjudicated classes | IMPLEMENTATION_DEFECT 345 · DUPLICATE_OR_CASCADE 238 · VALID_ADVISORY 216 | same verdicts |
+
+The verdicts themselves are unchanged — the same rules were adjudicated the
+same way. What moved is how many findings each rule produces, for the reasons
+in Part 1e. Grammar-layer FP rose to 126 because 8 distinct defective source
+lines are now each reported once per recovered scope instance, not because a
+new parsing defect appeared.
 
 Three of these were invisible inside a single aggregate number:
 
-- **48.3% of findings are UNRESOLVED.** They are counted as neither true nor
+- **48.9% of findings are UNRESOLVED.** They are counted as neither true nor
   false. Any overall precision figure folding them in would be meaningless.
-- **35.4% share a subject** with another finding — cascades, not independent
-  evidence.
-- **27.4% carry file provenance.** That is the real cost of the
+- **51.7% share a subject** with another finding — cascades, not independent
+  evidence. This share rose with expansion: the same underlying condition is
+  now reported for each of its instances.
+- **40.9% carry file provenance.** That is the real cost of the
   `record_files` line-number-only limitation, now measured rather than
   described. It has since been improved to (file, line) resolution with
   subject-based fallback; see Part 1b.
