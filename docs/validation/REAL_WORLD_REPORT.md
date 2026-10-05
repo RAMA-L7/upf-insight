@@ -340,29 +340,48 @@ Cascade removed: UPF-031 48→0, UPF-025 177→52, UPF-030 177→63, UPF-034 16�
 
 | | Before adjudication | After |
 |---|---|---|
-| AnyCore load-set findings | 2296 | **1651** |
+| AnyCore load-set findings | 2296 | **1546** |
 | UPF-087 | 309 | **0** |
 | UPF-031 | 48 | **0** |
 | Grammar-layer FP count | 32 | 32 (unchanged) |
-| Grammar-layer FP *rate* | 1.4% | 1.9% |
+| Grammar-layer FP *rate* | 1.4% | 2.1% |
 
 The rate moved up only because the denominator shrank; the absolute count of
 grammar-layer false positives is unchanged. This is also why no single
 "accuracy" figure is quoted — see the confidence limitations below.
 
-### A measurement caveat: load order is semantically significant
+### Load order is semantically significant — and is now pinned
 
-The same corpus validated as one load set yields **1651 or 1686 findings**
-depending on how the file list was enumerated. `sorted()` on paths and
-`Path.glob` disagree on collation (`RamPartitioned_FreePDK.upf` sorts before
-`RamPartitionedAL.upf` under `Path.glob`, after it under `sorted()`), and
-because `set_scope` / `load_upf` are positional, order legitimately changes the
-model — UPF-038 (185 vs 220) and UPF-041 (61 vs 68) are the rules that move.
+`set_scope` / `load_upf` are positional, so which file is read first decides
+which same-named object wins. Enumeration order is therefore part of the
+measurement, not an incidental detail.
 
-Both orders are individually deterministic and repeatable. They simply measure
-different load orders. **When quoting a load-set figure, state the enumeration
-method.** `scripts/validate_external.py` and `scripts/adjudicate.py` currently
-differ here; they should agree on one canonical order.
+An earlier revision of this report claimed the corpus "yields 1651 or 1686
+findings depending on how the file list was enumerated". **That was measured
+against a superseded engine state and is no longer reproducible.** Re-measured
+on the current engine (v0.3.0-validation.3):
+
+| Enumeration | AnyCore load-set findings |
+|---|---|
+| `sorted(Path)` — case-folded on Windows | 1546 |
+| `sorted(str)` — byte-wise | 1546 |
+| `Path.glob` unsorted | 1546 |
+| `sorted(name)`, `sorted(casefold)`, `sorted(lower)` | 1546 |
+| reversed order (control) | 1696 |
+
+The `sorted(Path)` vs `sorted(str)` divergence is real — those two collations
+disagree on `RamPartitioned_FreePDK.upf` vs `RamPartitionedAL.upf` at index 31
+— but on this corpus it does **not** move the finding count. Order only starts
+to matter when the sequence is genuinely rearranged (the reversed control
+differs by 150). The two harnesses' numbers differed by mode, not order:
+`validate_external.py` defaults to per-file (1337) while `adjudicate.py`
+defaults to load-set (1546).
+
+`scripts/corpus.py` now owns corpus definitions and enumeration for both
+harnesses, with the collation pinned to a case-sensitive sort on the POSIX-style
+relative path — platform-independent, and not at the mercy of the host
+filesystem's collation rules. Both tools report **1546** for AnyCore and **0**
+for Tenstorrent. `tests/test_corpus_enumeration.py` pins the invariant.
 
 ### A stronger caveat: load-set mode is not a faithful flow for this corpus
 
