@@ -451,8 +451,21 @@ UPF-086 moved 47 → 62, a genuine change.
 
 ### Finding inventory, before → after (AnyCore, load-set)
 
-Total **1546 → 2663** (+1117). Per-file mode is **unchanged at 1337**, which is
-the check that single-file behaviour was not disturbed.
+Total **1546 → 2663**. **These two numbers are not directly comparable as a
+quality metric**, and the increase is not a regression:
+
+```text
+old model  → incomplete representation  → 1546 findings
+new model  → expanded load sites       → 2663 findings
+                                          (previously invisible instances
+                                           are now validated)
+```
+
+The old model discarded roughly 50 child instances, so it was never in a
+position to report findings that live inside them. The new model validates
+substantially more of the actual UPF structure, which necessarily surfaces
+more findings. The meaningful per-file comparison is unchanged: **1337 →
+1337**, which is the check that single-file behaviour was not disturbed.
 
 | Rule | Before | After | Δ | Why |
 |---|---|---|---|---|
@@ -482,13 +495,27 @@ numbers.** Every decrease above is explained by the model becoming more
 faithful; every increase is a per-instance finding that was previously
 suppressed by an object being dropped.
 
-### Grammar-layer false positives: 32 → 126
+**None of these findings should be assumed correct merely because they appeared
+after model expansion.** UPF-038's 620 is the clearest case: it grew because 30
+recovered `PD_PIPEREG` instances each began reporting an unmodeled switch
+output. Whether those are (A) real per-instance violations, (B) valid
+advisories, (C) artifacts of the newly recovered model, (D) another modelling
+defect, or (E) cascades is **unadjudicated**. The same caution applies to the
+1303 unresolved findings. Establishing which is the next milestone — it is no
+longer parser correctness.
 
-This is **not** a new parsing defect. All 126 come from **8 distinct source
-lines**, each reported once per recovered scope instance (line 53 ×59,
-line 61 ×55). The underlying `add_pst_state` brace-group defect is unchanged;
-only its instance count is now honest. The *rate* moved 1.4% → 4.7% for the
-same reason the denominator grew.
+### Grammar-layer false positives: 32 → 126 occurrences
+
+After cross-file expansion, known grammar-layer false-positive **occurrences**
+increased from 32 to 126 because previously discarded UPF instances are now
+validated. The underlying parsing defects are unchanged. The 126 occurrences
+originate from **8 source lines** across recovered scope instances (line 53
+reported 59 times, line 61 reported 55 times).
+
+The grammar-FP *rate* therefore moved from 1.4% to 4.7%. That figure should
+not be quoted as a regression in parser quality: the denominator grew because
+the model now represents more of the project, and the defect count behind the
+occurrences is the same set of 8 lines.
 
 ### What is still unfaithful
 
