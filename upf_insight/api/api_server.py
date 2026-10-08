@@ -39,6 +39,21 @@ def _bounded(root: str, path: str):
         return candidate
     return None
 
+
+#: Maximum accepted request body. The largest legitimate payload is a UPF
+#: file or a multi-file design, both well under a megabyte; the cap stops a
+#: single request from allocating an arbitrary amount of memory.
+_MAX_BODY_BYTES = 8 * 1024 * 1024
+
+
+class _BodyError(Exception):
+    """Raised for a malformed or oversized request body."""
+
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+
 # Theme / status metadata served to the workspace (single source of truth).
 _DESIGN = {
     "version": __version__,
@@ -86,6 +101,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _read_json(self) -> Dict:
+        """Read and decode a JSON request body, bounded in size.
+
+        Raises ``_BodyError`` for an oversized or malformed body so the
+        caller can return a proper 4xx instead of dropping the connection.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            raise _BodyError("invalid Content-Length header", 400)
+        if length < 0:
+            raise _BodyError("invalid Content-Length header", 400)
+        if length > _MAX_BODY_BYTES:
+            raise _BodyError(
+                f"request body exceeds {_MAX_BODY_BYTES} bytes", 413
+            )
+        raw = self.rfile.read(length) if length else b""
+        try:
+            payload = json.loads(raw or b"{}")
+        except (ValueError, UnicodeDecodeError):
+            raise _BodyError("request body is not valid JSON", 400)
+        if not isinstance(payload, dict):
+            raise _BodyError("request body must be a JSON object", 400)
+        return payload
 
     _CONTENT_TYPES = {
         ".html": "text/html; charset=utf-8",
@@ -155,10 +195,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        """Entry point: translate body-level failures into JSON 4xx.
+
+        Without this, a malformed body raised out of the handler and the
+        client saw a dropped connection instead of an error it could read.
+        """
+        try:
+            self._dispatch_post()
+        except _BodyError as exc:
+            self._send_json({"error": exc.message}, status=exc.status)
+
+    def _dispatch_post(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/validate":
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = self._read_json()
             files = payload.get("files", [])
             content = payload.get("content")
             design = payload.get("design")
@@ -178,6 +228,12 @@ class Handler(BaseHTTPRequestHandler):
                             status=400,
                         )
                         return
+                    if not os.path.isfile(bounded):
+                        self._send_json(
+                            {"error": f"file not found: {f}"},
+                            status=400,
+                        )
+                        return
                     safe_files.append(bounded)
                 netlist = payload.get("netlist")
                 if netlist:
@@ -188,8 +244,24 @@ class Handler(BaseHTTPRequestHandler):
                             status=400,
                         )
                         return
+                    if not os.path.isfile(bounded):
+                        self._send_json(
+                            {"error": f"netlist not found: {netlist}"},
+                            status=400,
+                        )
+                        return
                     netlist = bounded
-                result = validate(safe_files, netlist=netlist)
+                try:
+                    result = validate(safe_files, netlist=netlist)
+                except OSError as exc:
+                    # Unreadable input is a readable 4xx, not a dropped
+                    # connection -- the body-bounds contract applied to file
+                    # I/O.
+                    self._send_json(
+                        {"error": f"cannot read input: {exc}"},
+                        status=400,
+                    )
+                    return
             self._send_json(result.to_dict())
         elif parsed.path == "/api/generate":
             from ..generate.generator import (
@@ -207,8 +279,7 @@ class Handler(BaseHTTPRequestHandler):
                 generate_skeleton,
             )
             if self.command == "POST":
-                length = int(self.headers.get("Content-Length", 0))
-                payload = json.loads(self.rfile.read(length) or b"{}")
+                payload = self._read_json()
                 raw = payload.get("params") or {}
                 try:
                     params = UPFParams(
@@ -257,8 +328,7 @@ class Handler(BaseHTTPRequestHandler):
                                             retention=["core"])
                 self._send_json({"content": content})
         elif parsed.path == "/api/diff":
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = self._read_json()
             old_text = payload.get("old")
             new_text = payload.get("new")
             if not old_text or not new_text:
@@ -294,8 +364,7 @@ class Handler(BaseHTTPRequestHandler):
                 },
             })
         elif parsed.path == "/api/gate":
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = self._read_json()
             content = payload.get("content")
             if not content:
                 self._send_json(
@@ -337,8 +406,7 @@ class Handler(BaseHTTPRequestHandler):
                 "result": current.to_dict(),
             })
         elif parsed.path == "/api/report":
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = self._read_json()
             content = payload.get("content")
             if not content:
                 self._send_json(

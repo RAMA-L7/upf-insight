@@ -413,11 +413,16 @@
     "warning_count": 7
   },
   {
-    "error_count": 2,
+    "error_count": 3,
     "file": "tests/examples/example.pst_bad.upf",
     "findings": [
       {
         "rule": "UPF-030",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
         "severity": "error",
         "subject": ""
       },
@@ -482,7 +487,7 @@
       {
         "rule": "UPF-038",
         "severity": "warning",
-        "subject": ""
+        "subject": "DRV2"
       },
       {
         "rule": "UPF-042",
@@ -1081,159 +1086,9 @@
     "warning_count": 6
   },
   {
-    "error_count": 52,
+    "error_count": 32,
     "file": "tests/examples/user_coverage_example.upf",
     "findings": [
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
-      {
-        "rule": "UPF-002",
-        "severity": "error",
-        "subject": ""
-      },
       {
         "rule": "UPF-010",
         "severity": "error",
@@ -1375,6 +1230,71 @@
         "subject": ""
       },
       {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-031",
+        "severity": "error",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "pd_gated"
+      },
+      {
+        "rule": "UPF-040",
+        "severity": "warning",
+        "subject": "pd_gated_aon"
+      },
+      {
         "rule": "UPF-043",
         "severity": "info",
         "subject": "pd_gated"
@@ -1418,6 +1338,11 @@
         "rule": "UPF-047",
         "severity": "warning",
         "subject": "pd_gated_aon"
+      },
+      {
+        "rule": "UPF-050",
+        "severity": "warning",
+        "subject": "pd_gated"
       },
       {
         "rule": "UPF-051",
@@ -1501,6 +1426,6 @@
       }
     ],
     "readiness": "BLOCKED",
-    "warning_count": 14
+    "warning_count": 18
   }
 ]

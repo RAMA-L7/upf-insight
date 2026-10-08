@@ -1,0 +1,12 @@
+# A PST may name a switched supply by its PORT path (SW/vout).
+# AnyCore ActiveList.upf:63. Defect: UPF-038 compared net names only.
+upf_version 2.1
+create_supply_net VDD
+create_supply_net VDD_SW -domain PD_CPU
+create_power_domain PD_CPU -elements {u_cpu} -supply { primary VDD_SW }
+create_power_switch SW_CPU -domain PD_CPU \
+    -output_supply_port {vout VDD_SW} -input_supply_port {vin VDD} \
+    -control_port en -on_state {on_s vin {en}} -off_state {off_s {!en}}
+add_supply_state VDD_SW -state {ON 1.0} -state {OFF off}
+create_pst Core_PST -supplies { VDD SW_CPU/vout }
+add_pst_state ALL_OFF -pst Core_PST -state {ON OFF}

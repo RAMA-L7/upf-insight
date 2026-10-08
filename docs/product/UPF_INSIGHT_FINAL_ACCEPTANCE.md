@@ -1,5 +1,13 @@
 # UPF-Insight — Final Acceptance Matrix
 
+> ⚠️ **Historical snapshot (v0.1.0, 2026-08).** The counts below — 122 tests,
+> 65 rules, 9 CLI commands, version 0.1.0 — were true when this matrix was
+> measured and are deliberately left unedited so the record stays honest.
+> Current figures are **v0.3.0 · 77 rules · 295 tests · 16 CLI commands**;
+> regenerate the rule reference with
+> `python scripts/generate_rules_registry.py`. Do not read the numbers below
+> as current.
+
 > **Status:** applied against the frozen functional baseline
 > (`UPF_INSIGHT_FUNCTIONAL_BASELINE.md`). Every status below is backed by
 > measured evidence: the 114-test suite, CLI runs, API regression tests, and

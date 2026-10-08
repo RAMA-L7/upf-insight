@@ -1,0 +1,7 @@
+# Backslash before EOL is whitespace, even inside braces.
+# AnyCore BPU.upf:176 / Decode.upf:54. Defect D7.
+upf_version 2.1
+create_supply_net VSS
+connect_supply_net VSS -ports { VSS  \
+                              counter_gen[0].counterTable/VSS  \
+                              counter_gen[1].counterTable/VSS }

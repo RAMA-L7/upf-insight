@@ -1,0 +1,61 @@
+# soc_top.upf - power intent for tests/fixtures/soc_top.v
+#
+# Used by tests/test_netlist_design_aware.py as the design-aware case:
+# RTL -> Yosys -> synthesized netlist -> this UPF -> validate(..., netlist=...).
+#
+# The control signals here are written the way production UPF writes them:
+#   -control_port {ctrl iso_en_cpu}      (role + signal pair)
+#   -save_signal    {save ret_en_cpu}    (signal + polarity)
+# so the case proves those forms normalize to real design objects instead of
+# being compared as literal brace strings.
+
+upf_version 2.1
+set_design_top soc_top
+
+# ── supplies ───────────────────────────────────────────────────────────────
+create_supply_port VDD -direction in
+create_supply_port VSS -direction in
+create_supply_net VDD -resolve port
+create_supply_net VSS -resolve port
+connect_supply_net VDD -ports VDD
+connect_supply_net VSS -ports VSS
+
+create_supply_net VDD_SW -domain PD_CPU
+create_supply_net VDD_AON
+
+# ── domains ────────────────────────────────────────────────────────────────
+create_power_domain PD_TOP -include_scope
+create_power_domain PD_CPU -elements {u_cpu} -supply { primary VDD_SW }
+create_power_domain PD_SRAM -elements {u_sram} -supply { primary VDD_AON }
+
+set_domain_supply_net PD_TOP -primary_power_net VDD -primary_ground_net VSS
+
+# ── retention on the CPU domain ────────────────────────────────────────────
+set_retention RET_CPU \
+    -domain PD_CPU \
+    -elements {u_cpu} \
+    -retention_power_net VDD_AON \
+    -retention_ground_net VSS
+
+set_retention_control RET_CPU \
+    -domain PD_CPU \
+    -save_signal {ret_en_cpu high} \
+    -restore_signal {ret_en_cpu low}
+
+# ── isolation on the CPU boundary ──────────────────────────────────────────
+set_isolation ISO_CPU \
+    -domain PD_CPU \
+    -elements {u_cpu} \
+    -isolation_power_net VDD_AON \
+    -isolation_ground_net VSS \
+    -clamp_value 0 \
+    -applies_to outputs
+
+set_isolation_control ISO_CPU \
+    -domain PD_CPU \
+    -isolation_signal iso_en_cpu \
+    -isolation_sense low \
+    -location parent
+
+map_isolation_cell ISO_CPU my_lib/iso_cell
+map_retention_cell RET_CPU my_lib/retention_cell

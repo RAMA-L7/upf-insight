@@ -55,15 +55,24 @@ jobs:
           pip install -e .
           upf-insight check tests/examples/cpu_subsys/cpu_subsys_v1.upf \
             --save-baseline baseline.json > /dev/null || true
-      - name: UPF quality gate
+      - name: UPF quality gate (must BLOCK the planted regression)
         id: gate
+        # cpu_subsys_v2 is the deliberately regressed fixture: the 1.8 V level
+        # shifter declared in v1 was removed, so UPF-061 fires and the gate
+        # returns FAIL. That FAIL is the detector working, not a broken job --
+        # this step used to go red on every run because it expected a PASS.
+        # continue-on-error lets the verdict step assert the FAIL below.
+        continue-on-error: true
         uses: ./.github/actions/upf-gate
         with:
           upf: tests/examples/cpu_subsys/cpu_subsys_v2.upf
           baseline: baseline.json
           gate: NO_READINESS_REGRESSION
       - name: Gate verdict
-        run: echo "gate-result=${{ steps.gate.outputs.gate-result }}"
+        run: |
+          echo "gate-result=${{ steps.gate.outputs.gate-result }}"
+          test "${{ steps.gate.outputs.gate-result }}" = "FAIL" \
+            || { echo "::error::gate did not block the planted UPF-061 regression"; exit 1; }
 
   lint:
     runs-on: ubuntu-latest

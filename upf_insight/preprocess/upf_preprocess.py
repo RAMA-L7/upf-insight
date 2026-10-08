@@ -10,9 +10,23 @@ no execution, and every emitted record carries its provenance (file, line).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List
+
+#: Command names that can legitimately start a new logical command while the
+#: lexer is inside an unbalanced brace. Used for recovery only — a line that
+#: begins with one of these is treated as a fresh command, which stops a single
+#: stray ``{`` from swallowing the remainder of the file.
+#:
+#: This is what lets the lexer honour multi-line ``-elements { ... }`` lists
+#: *and* still survive malformed input. The unbalanced construct is preserved
+#: in the record text, so UPF-006 still reports it.
+_COMMAND_START = re.compile(
+    r"^(?:upf_version|set_design_top|set_scope|create_\w+|connect_\w+|"
+    r"add_\w+|set_\w+|update_\w+|map_\w+|load_upf|upf_\w+)\b"
+)
 
 
 @dataclass(frozen=True)
@@ -82,31 +96,55 @@ def preprocess(text: str, file: str = "<string>") -> List[CommandRecord]:
             i += 1
             continue
 
-        # --- physical end of line: command terminator ---
+        # --- physical end of line ---
+        #
+        # A newline terminates a command only at depth zero. Inside braces,
+        # brackets, or a double-quoted string it is ordinary whitespace, so a
+        # multi-line `-elements { ... }` list stays one logical command.
+        #
+        # Recovery: if we are inside a construct that never closes and the next
+        # line begins with a real UPF command, the brace was unbalanced. Emit
+        # what we have (UPF-006 reports the imbalance) and resume at depth 0,
+        # rather than swallowing the rest of the file.
         if c == "\n":
-            flush()
+            if brace == 0 and bracket == 0 and not dq:
+                flush()
+            elif _COMMAND_START.match(text[i + 1:].lstrip()) and not dq:
+                flush()
+                brace = bracket = 0
+            else:
+                buf.append(" ")
+                mark()
             line += 1
             i += 1
             continue
 
-        # --- line continuation: backslash at EOL, outside quotes/braces/brackets ---
-        if c == "\\" and (
-            nxt == "\n"
-            or (nxt == "\r" and i + 2 < n and text[i + 2] == "\n")
-        ):
-            if brace == 0 and bracket == 0 and not dq:
+        # --- line continuation: backslash before (optional spaces and) EOL ---
+        #
+        # A backslash standing for whitespace before a newline is a line
+        # continuation *everywhere*, including inside braces. Real UPF relies
+        # on this in multi-line lists, e.g.
+        #
+        #     connect_supply_net VSS -ports { VSS  \
+        #                                      dom0/VSS  \
+        #                                      dom1/VSS }
+        #
+        # Preserving the backslash put a literal '\' into the port list, which
+        # then surfaced as a bogus "unknown target '\'" (UPF-024) once per
+        # continuation. Some files emit "…  \ " with a trailing space *after*
+        # the backslash, so the run of spaces/tabs between the backslash and
+        # the newline is consumed too — the backslash means "this is
+        # whitespace", and the spaces it introduces are the same whitespace.
+        if c == "\\":
+            j = i + 1
+            while j < n and text[j] in (" ", "\t"):
+                j += 1
+            if j < n and (text[j] == "\n" or
+                          (text[j] == "\r" and j + 1 < n and text[j + 1] == "\n")):
                 buf.append(" ")
-                if nxt == "\r":
-                    i += 3
-                else:
-                    i += 2
+                i = j + 2 if text[j] == "\r" else j + 1
                 line += 1
                 continue
-            # literal backslash inside a construct -- keep it verbatim
-            mark()
-            buf.append(c)
-            i += 1
-            continue
 
         # --- comment: '#' outside braces/brackets/quotes, at command start or
         #     preceded by whitespace (so 'foo#bar' and '#' inside {} [] "" survive) ---

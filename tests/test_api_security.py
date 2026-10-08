@@ -2,8 +2,10 @@
 
 import json
 import os
+import tempfile
 import threading
 from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
 import pytest
@@ -47,8 +49,26 @@ def test_assets_in_root_serves_200(server):
     assert status == 200
 
 
-def test_validate_out_of_root_file_returns_400(server):
-    body = json.dumps({"files": [r"C:\Windows\win.ini"]}).encode()
+@pytest.fixture()
+def outside_root_file():
+    """An existing file guaranteed to sit outside the workspace root.
+
+    A hardcoded Windows path only exercises the root bound *on Windows*; on
+    POSIX ``C:\\Windows\\win.ini`` is a relative name that resolves inside the
+    root, so the request reached the engine with a missing file and the server
+    dropped the connection. A temp file keeps the test about the root bound on
+    every platform.
+    """
+    fd, path = tempfile.mkstemp(prefix="upf-outside-root-", suffix=".upf")
+    os.close(fd)
+    assert not os.path.realpath(path).startswith(os.path.realpath(ROOT) + os.sep), \
+        "temp file unexpectedly inside the workspace root"
+    yield path
+    os.remove(path)
+
+
+def test_validate_out_of_root_file_returns_400(server, outside_root_file):
+    body = json.dumps({"files": [outside_root_file]}).encode()
     req = Request(server + "/api/validate", data=body,
                   headers={"Content-Type": "application/json"})
     with pytest.raises(Exception) as ei:
@@ -86,3 +106,68 @@ def test_validate_content_ignores_files(server):
                   headers={"Content-Type": "application/json"})
     with urlopen(req, timeout=10) as r:
         assert r.status == 200
+
+# ── Request-body bounds ─────────────────────────────────────────────────────
+#
+# A malformed body must come back as a readable 4xx, not a dropped
+# connection, and an oversized one must be refused before it is read.
+
+def _post(base, body, path="/api/validate", extra_headers=None):
+    headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
+    req = Request(base + path, data=body, headers=headers)
+    try:
+        with urlopen(req, timeout=5) as r:
+            return r.status, r.read()
+    except HTTPError as e:
+        # Only a real HTTP status counts. A transport failure must surface as
+        # itself, not collapse to None -- masking it here is what made these
+        # assertions intermittently fail for the wrong reason.
+        return e.code, e.read()
+    except Exception as e:  # URLError, RemoteDisconnected, timeouts
+        return type(e).__name__, b""
+
+
+def test_valid_body_still_returns_200(server):
+    status, _ = _post(server, json.dumps({"content": "create_power_domain PD_A"}).encode())
+    assert status == 200
+
+
+def test_malformed_json_returns_400_not_a_dropped_connection(server):
+    status, _ = _post(server, b"not json at all")
+    assert status == 400
+
+
+def test_non_object_json_returns_400(server):
+    status, _ = _post(server, b"[1, 2, 3]")
+    assert status == 400
+
+
+def test_empty_body_is_accepted(server):
+    status, _ = _post(server, b"")
+    assert status == 200
+
+
+def test_oversized_body_is_refused_with_413(server):
+    oversized = str(api_server._MAX_BODY_BYTES + 1)
+    status, _ = _post(server, b"{}", extra_headers={"Content-Length": oversized})
+    assert status == 413
+
+
+def test_validate_missing_in_root_file_returns_400_not_a_dropped_connection(server):
+    """A path inside the root that does not exist must be a readable 400.
+
+    On POSIX the old assertion passed a Windows path that resolved *inside*
+    the root, so the engine raised FileNotFoundError and the client saw a
+    dropped connection instead of a status.
+    """
+    missing = os.path.join("tests", "examples", "no_such_file.upf")
+    status, body = _post(server, json.dumps({"files": [missing]}).encode())
+    assert status == 400
+    assert "not found" in json.loads(body)["error"]
+
+
+def test_negative_content_length_returns_400(server):
+    status, _ = _post(server, b"{}", extra_headers={"Content-Length": "-5"})
+    assert status == 400

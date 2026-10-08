@@ -14,10 +14,13 @@ Deterministic · Evidence-backed · Local-first · Reproducible
 
 ## 🆕 What's New
 
-### v0.2.0 (latest)
+### v0.3.0 (latest)
 
-**Flat + Hierarchical power-intent - now first-class in both Generator and
-Validation.**
+**sdc-tools parity sprint - Verilog netlist parsing, design coverage, and
+strategy-interaction rules (UPF-085…100).**
+
+Flat + Hierarchical power-intent is now first-class in both Generator and
+Validation.
 
 - **Canonical domain-relation model** - one model powers the generator,
   validator, CLI, API, reports and UI. Domain types are evidence-based:
@@ -201,7 +204,7 @@ locally; nothing leaves your machine. [Full trust model](docs/upf/TRUST_MODEL.md
 
 ## Benchmarks
 
-UPF-Insight ships with rerunnable evidence: a **94-test suite** (engine,
+UPF-Insight ships with rerunnable evidence: a **295-test suite** (engine,
 flow/coverage, generator, API security, plus the realistic CPU-subsystem
 Test Drive regression suite) over golden known-good/known-bad fixtures.
 See [docs/upf/BENCHMARK_EVIDENCE_MAP.md](docs/upf/BENCHMARK_EVIDENCE_MAP.md).

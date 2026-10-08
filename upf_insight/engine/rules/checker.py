@@ -80,12 +80,15 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
         try:
             findings = handler(model)
         except Exception as exc:  # a rule must never crash the whole run
+            # NOT_VALIDATED, not VALIDATED: a rule that crashed proved
+            # nothing about the design. Tagging it VALIDATED would let an
+            # engine bug read as a clean bill of health.
             findings = [
                 Finding(
                     rule=rule.code,
                     severity="error",
                     message=f"internal rule error: {exc}",
-                    support="VALIDATED",
+                    support="NOT_VALIDATED",
                 )
             ]
         for f in findings:
@@ -95,6 +98,12 @@ def check_model(model: PowerIntentModel, rules: Optional[List[str]] = None) -> C
     _apply_cascade_suppression(result)
     _enforce_evidence_boundary(result)
     _resolve_finding_files(model, result.findings)
+    # The field is serialized in to_dict(); populate it rather than leaving
+    # every consumer an empty dict. Lazy import keeps the rule layer free of
+    # a module-level dependency on the trust package.
+    from ..trust.support_boundary import compute_support_boundary
+
+    result.support_boundary = dict(compute_support_boundary(model).statuses)
     return result
 
 
@@ -147,21 +156,73 @@ def _enforce_evidence_boundary(result: CheckResult) -> None:
 def _resolve_finding_files(model: PowerIntentModel, findings) -> None:
     """Populate ``Finding.file`` from the authoritative record provenance index.
 
-    The engine knows the source filename for every command line; findings that
-    carry a ``line`` can therefore resolve their file. When the same line
-    number appears in more than one file (multi-file runs with colliding line
-    numbers), the provenance is ambiguous and the field is left empty rather
-    than invented.
+    Line numbers repeat across files, so the old line-only index could not say
+    *which* file a finding came from and left the field empty whenever two
+    files shared a line number — which is most of a 37-file run, losing
+    attribution on ~85% of findings.
+
+    Resolution now works on ``(file, line)`` pairs:
+
+    1. the declaring object named in ``Finding.subject`` (domains, switches and
+       strategies all carry ``declared_file``);
+    2. otherwise, a line that occurs in exactly one file.
+
+    When neither is conclusive the field stays empty — ambiguity is reported,
+    never invented.
     """
     if not model:
         return
+
+    # subject name -> set of files declaring it. A subject is authoritative only
+    # when exactly ONE file declares it: if two files both declare `NOPE`,
+    # neither is the answer, and picking one would misattribute the other.
+    declared_in: dict = {}
+    for table in ("domains", "switches", "isolation", "retentions",
+                  "level_shifters", "repeaters", "supply_nets", "supply_ports",
+                  "supply_sets", "psts"):
+        for key, obj in _iter_objects(getattr(model, table, None)):
+            declared = getattr(obj, "declared_file", None)
+            if not declared:
+                continue
+            name = getattr(obj, "name", None) or getattr(obj, "domain", None)
+            for candidate in (name, key, (key or "").split("/")[-1]):
+                if candidate:
+                    declared_in.setdefault(candidate, set()).add(declared)
+    by_subject = {k: next(iter(v)) for k, v in declared_in.items()
+                  if len(v) == 1}
+
     index = model.record_files or {}
     for f in findings:
         if f.file or not f.line:
             continue
         files = index.get(f.line)
         if files and len(files) == 1:
+            # Unambiguous: this line number occurs in exactly one file.
             f.file = files[0]
+            continue
+        # Colliding line numbers: fall back to the declaring object, which
+        # records its own source file. The checker runs over the final model,
+        # so that object *is* the declaration the finding is about.
+        if f.subject:
+            declared = by_subject.get(f.subject)
+            if declared:
+                f.file = declared
+
+
+def _iter_objects(table):
+    """Yield ``(key, object)`` from a model table that may be dict or list.
+
+    Model collections are heterogeneous: domains and switches are dicts keyed
+    by scoped name, strategies are lists. Both shapes must yield the same
+    (key, object) pairs for provenance to be resolvable.
+    """
+    if isinstance(table, dict):
+        yield from table.items()
+    elif isinstance(table, (list, tuple)):
+        for i, obj in enumerate(table):
+            name = (getattr(obj, "name", None)
+                    or getattr(obj, "domain", None) or str(i))
+            yield name, obj
 
 
 def check_records(records, model: Optional[PowerIntentModel] = None,

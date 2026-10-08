@@ -1,0 +1,9 @@
+# A bus bit-select is a literal, not a wildcard.
+# AnyCore ActiveList.upf:44. Defect: UPF-087 fired on every bus bit.
+upf_version 2.1
+create_power_domain PD_PART0 -elements {INST_LOOP[0].ram_instance}
+create_supply_net INST_LOOP[0].cam_instance/VDD
+create_power_switch SW0 -domain PD_PART0 \
+    -output_supply_port {vout INST_LOOP[0].cam_instance/VDD} \
+    -input_supply_port {vin VDD} -control_port {ctrl alPartitionActive_i[2]} \
+    -on_state {on_s vin {ctrl}} -off_state {off_s {!ctrl}}

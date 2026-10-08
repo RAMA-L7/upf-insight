@@ -5,6 +5,232 @@ All notable changes to UPF-Insight are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Measured - external corpora re-validated (AnyCore 65% -> 1.4%, Tenstorrent 100% -> 0%)
+
+Both external corpora named in `docs/validation/REAL_WORLD_REPORT.md` were
+located on this host and re-measured against the current engine. The historical
+65% / 100% figures were previously labelled unverified; they are now replaced
+by measurements.
+
+| Corpus | Historical | Measured now |
+|---|---|---|
+| AnyCore RISC-V (37 files, `power_spec/*.upf` @ `419cc6c`) | 4012 findings, 65% FP | **2268 findings, 32 FP (1.4%)** |
+| Tenstorrent AOU (1 file, 9 commands, Apache-2.0) | 1 finding, 100% FP | **0 findings, 0 FP** |
+
+- `scripts/validate_external.py` — new harness. Read-only (SHA-256 manifest
+  compared before/after each run), deterministic (`--verify-determinism` runs
+  each corpus twice and compares), and it reports each finding in exactly one of
+  five categories: parser failure / normalization failure / genuine semantic /
+  ambiguous / validator defect. A corpus that is absent is reported as
+  `unavailable` with the reason, never skipped silently.
+- `--load-set` mode validates a whole corpus as one load set, which is how
+  hierarchical UPF is actually consumed. Per-file is 5.0% FP; load-set is
+  **1.4%**, because a top file `load_upf`s children into named scopes and
+  single-file validation under-reports the model.
+- `tests/test_external_corpus_regressions.py` — 23 hard assertions, one per
+  defect found below.
+- `tests/fixtures/soc_top.v` + `soc_top.upf` and
+  `tests/test_netlist_design_aware.py` — RTL -> Yosys -> synthesized netlist ->
+  UPF -> design-aware validation, including a negative control proving a
+  genuinely absent signal is still reported.
+
+### Fixed - nine defects found only in real open-source UPF
+
+None of these were visible from the shipped corpus; each was found by running
+the external corpora and inspecting the original UPF construct.
+
+- **Backslash continuation inside braces** — Tcl treats a backslash before a
+  newline as whitespace *everywhere*, including inside `{}`. The lexer
+  preserved it, putting a literal `\` into multi-line port lists and producing
+  "unknown target `'\'`" once per continuation. Also handles `…  \ ` with a
+  trailing space after the backslash, which AnyCore emits.
+- **`create_power_domain -include_scope PD_RAM`** — real UPF puts flags before
+  the name, so `args[0]` named the domain `-include_scope` and the real name was
+  lost. The name is now the first positional argument.
+- **Plain Tcl reported as unknown UPF** — a `.upf` file is a Tcl script;
+  `set`, `source`, `foreach`, `[set_scope …]` are not UPF commands and no longer
+  raise UPF-001. Genuinely unknown commands are still reported.
+- **`create_supply_net -domain` / `-reuse` / `-exclude`** — legal IEEE 1801,
+  previously rejected (543 findings in AnyCore alone).
+- **`create_power_domain -scope`** — legal IEEE 1801, previously rejected.
+- **`set_isolation -diff_supply_only`** — legal IEEE 1801, previously rejected.
+- **`-control_port {ctrl sig}` pairs** — the pair's first half names the port
+  *role*, not the signal. Rules were comparing the braced literal against the
+  design. The signal half is now extracted; the role is retained so a condition
+  legitimately referencing `{ctrl}` is not flagged.
+- **Relative `set_scope` composition** — `set_scope` assigned absolutely,
+  dropping the prefix a child was loaded into, so supplies were keyed `btb/VDD`
+  while the parent referenced `fs1/btb/VDD`. Relative scopes now compose;
+  restating the current scope stays idempotent.
+- **`UPF-081` compared `{sig sense}` against the design** — `-save_signal
+  {ret_en high}` could never match. Now split into `save_signal_name` /
+  `save_signal_sense`, verified against a synthesized netlist.
+
+### Fixed - real-world false positives (shipped corpus now 0%)
+
+The parser and grammar defects recorded in the v0.3.0 validation report are
+fixed. False-positive rate on `tests/corpus/` goes from **44% (15 of 34) to 0%
+(0 of 21)**; all 21 remaining findings are genuine / needs-review advisories.
+
+- **Multi-line brace groups (D4)** — `preprocess()` now tracks brace/bracket
+  depth across newlines and splits a command only at depth 0, so a multi-line
+  `-elements { ... }` is one command rather than N+1 phantom commands. An
+  unbalanced brace no longer swallows the rest of the file: if the next line
+  begins with a real UPF command, the lexer emits what it has (UPF-006 reports
+  the imbalance) and resumes at depth 0.
+- **Grammar coverage (D1)** — accepts and models the legal IEEE 1801 spellings
+  the engine previously rejected: `-include_scope` on `create_power_domain`,
+  `-isolation_power_net`/`-isolation_ground_net`,
+  `-retention_power_net`/`-retention_ground_net`, and `-location` on the
+  isolation/level-shifter/repeater control commands.
+- **Interchangeable required options** — `_REQUIRED_OPTIONS` now takes spelling
+  groups, so `create_power_switch` accepts the 2.1/3.0 `-input_supply` or the
+  3.1+ `-input_supply_port` rather than demanding one exact token (UPF-003).
+- **Brace-group expansion** — `connect_supply_net` records one entry per
+  resolved target instead of appending the raw `{ ... }` value, which is what
+  made UPF-024 report one unknown target named `'{ VDD_TOP }'`.
+- **Supply-port pairs (D5)** — `_supply_value()` unwraps a `{-port supply}` pair
+  and prefers the supply half, accepting both the `_supply` and `_power_net`
+  spellings across switch, isolation, retention, and repeater strategies.
+- **`map_power_switch`** — added to `_SUPPORTED` and `_LEGAL_OPTIONS`, matching
+  the existing `map_*_cell` handlers.
+
+All five former `xfail(strict=True)` markers in `tests/test_real_world_corpus.py`
+are inverted to hard assertions — the acceptance criterion set by the validation
+report. `test_semantic_checks_still_fire_on_real_upf` pins that the real checks
+still fire, so none of this was bought by disabling checks.
+
+The external open-source projects measured at v0.3.0 (65% FP on AnyCore, 100%
+on Tenstorrent) have **not** been re-measured — that UPF is not redistributed
+in this repository. Their defects were grammar-level and are fixed, so those
+figures are a historical upper bound, not a current claim. See
+`docs/validation/REAL_WORLD_REPORT.md`.
+
+### Added - real-world validation (tag v0.3.0-validation.1)
+
+- `scripts/validate_corpus.py` — runs the CLI over an external UPF corpus,
+  buckets every finding by root cause, and reports a false-positive rate.
+  Prints an `unclassified` bucket so new failure modes surface rather than
+  counting as genuine.
+- `tests/corpus/` — two shipped files: a hand-written file exercising legal
+  IEEE 1801 option spellings, and a UPF-Insight-generated file as a control.
+  (A third file — a real third-party SoC UPF, UPF 2.1, 4 domains, 3 power
+  switches — was measured but is **not** redistributed here; it belongs to
+  another project. See the report's note on the external file.)
+- `tests/test_real_world_corpus.py` — regression guard. As shipped, four tests
+  were marked `xfail(strict=True)` for the documented parser defects; they
+  flipped to passing when fixed, and are now inverted to hard assertions (see
+  the Fixed section above). Three assert the semantic checks still fire, so the
+  defects cannot be "fixed" by disabling real checks.
+- `docs/CAPABILITIES.md` — what the tool does and does not do, bounded by
+  measurement rather than aspiration.
+- `docs/validation/REAL_WORLD_REPORT.md` — methodology, corpus, per-defect
+  analysis, and prioritized improvements.
+
+### Measured result at v0.3.0 (superseded for the shipped corpus — see Fixed above)
+
+**56% false-positive rate on UPF the tool did not write** (53 of 95 findings),
+against a 100% mutation-detection rate on defects the same author injected.
+The control file — generated by UPF-Insight itself — scores 0 errors. The
+engine currently validates its own dialect rather than the standard.
+
+Root causes: the accepted-option grammar rejects 9 legal IEEE 1801 options
+(52% of all false positives), brace groups are not expanded in
+`connect_supply_net`, and `map_power_switch` is unsupported. The switch-grammar
+gap additionally disconnects every switch from its supplies, which cascades
+into a false UPF-076.
+
+P0 fixes are tracked in the validation report. Until they land, the tool
+should not be used as a CI gate.
+
+### Fixed - cross-file scope semantics (behavior change)
+
+Scope is now per-file state. Previously `model.current_scope` was never
+reset between files, so a UPF file that omitted `set_scope` silently
+inherited the previous file's scope and **results depended on the order
+files were listed on the command line**.
+
+- `builder`: `current_scope` resets at each file boundary. A file that
+  issues no `set_scope` starts at the top scope.
+- `builder`: `load_upf <file> -scope <scope>` now establishes the scope the
+  child is loaded into. The event recorded `child_scope` but nothing applied
+  it; per IEEE 1801 a child inherits that scope and need not repeat
+  `set_scope`. Every hierarchical fixture had been repeating `set_scope`
+  redundantly, which is why the gap was invisible.
+- `rules`: `_domain_by_name` resolved against the model's *final* scope
+  rather than each strategy's own scope, so findings could differ by file
+  order even after the reset above.
+
+**Impact:** for multi-file runs where a child UPF omits `set_scope`, domain
+keys and finding codes change. Single-file runs are unaffected. A genuine
+duplicate top-level supply definition across files now surfaces as
+`UPF-013` instead of being masked by the bleed.
+
+No new rule code was added: this corrects the model rather than flagging the
+designer's (well-formed) UPF.
+
+### Fixed - support-boundary honesty
+
+- `checker`: a rule that raised is now reported with `support=NOT_VALIDATED`
+  instead of `VALIDATED`. An internal crash proved nothing about the design.
+- `checker`: `CheckResult.support_boundary` is populated from
+  `compute_support_boundary()`; it was serialized but always `{}`.
+
+### Fixed - local API input bounds
+
+- `api_server`: request bodies are capped at 8 MiB (413 on overflow).
+- `api_server`: a malformed or non-object JSON body now returns a readable
+  4xx instead of dropping the connection. Applies to `/api/validate`,
+  `/api/generate`, `/api/diff`, `/api/gate`, and `/api/report`.
+
+### Tests
+
+- Added regression tests for cross-file scope: bleed, file-order
+  independence, and `load_upf -scope` inheritance.
+- Added positive and negative cases for UPF-015, UPF-016, UPF-025, UPF-032
+  and UPF-036, which previously had no assertion anywhere in the suite.
+- Added API request-body bound tests.
+- `test_rule_audit.py` now resolves every `test_ref` against the test tree.
+  Five refs pointed at test functions that did not exist; all are repointed.
+- `docs/upf/RULES_REGISTRY.md` is now generated by
+  `scripts/generate_rules_registry.py`, with a test that fails on drift. It
+  previously documented 65 rules and omitted UPF-085..100 entirely.
+
+### Fixed - CI: golden drift, a Windows-only test, and a gate that asserted the wrong verdict
+
+Three jobs were red on `main` and on this branch. Two were pre-existing; one
+was introduced by the engine work above.
+
+- **Golden contract (`engine-contract`)** - the parser change above moves rule
+  output, and the recorded signatures were never refreshed, so the job broke on
+  this branch (it was green on `main`). Re-recorded with
+  `python scripts/run_golden.py --update`; 18 fixtures, three of them changed:
+  `UPF-031` 1->2 (`example.pst_bad`), `UPF-038` subject gains its driving
+  supply (`DRV2`) (`example.pst_cross_bad`), and on
+  `user_coverage_example.upf` the 30 false `UPF-002` option-illegality errors
+  are gone while `UPF-031` 6->16, `UPF-040` 0->3 and `UPF-050` 0->1 now fire
+  because the model actually builds (errors 52->32). Every one of these is the
+  documented consequence of splitting multi-line commands at brace depth 0.
+- **Local API (`api_server`)** - a path that passed the workspace-root bound
+  but did not exist reached the engine, raised `FileNotFoundError`, and killed
+  the connection. Nonexistent files and netlists now return a readable 400,
+  and an unreadable input is caught as a 400 rather than a dropped connection.
+- **Tests** - `test_validate_out_of_root_file_returns_400` hardcoded
+  `C:\Windows\win.ini`, which only exercises the root bound on Windows. On
+  POSIX that string is a *relative* name that resolves inside the root, so the
+  test failed on ubuntu and macos with a dropped connection. It now uses an
+  existing temp file outside the root, and a new test asserts that a missing
+  in-root path returns 400 rather than dropping the connection. `_post` also
+  returns the real error body instead of discarding it.
+- **CI gate** - `cpu_subsys_v2.upf` is the *deliberately* regressed fixture
+  (the 1.8 V level shifter declared in v1 was removed), so
+  `GATE [NO_READINESS_REGRESSION] 3 new blocker(s)` -> FAIL is the detector
+  working. The job exited non-zero because it expected a PASS. It now runs the
+  gate with `continue-on-error` and asserts the verdict is `FAIL`, so the job
+  is green precisely while the planted UPF-061 regression is still blocked.
+
 ## [0.3.0] - 2026-08-23
 
 ### Added - sdc-tools parity sprint
