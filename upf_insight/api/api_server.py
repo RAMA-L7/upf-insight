@@ -228,6 +228,12 @@ class Handler(BaseHTTPRequestHandler):
                             status=400,
                         )
                         return
+                    if not os.path.isfile(bounded):
+                        self._send_json(
+                            {"error": f"file not found: {f}"},
+                            status=400,
+                        )
+                        return
                     safe_files.append(bounded)
                 netlist = payload.get("netlist")
                 if netlist:
@@ -238,8 +244,24 @@ class Handler(BaseHTTPRequestHandler):
                             status=400,
                         )
                         return
+                    if not os.path.isfile(bounded):
+                        self._send_json(
+                            {"error": f"netlist not found: {netlist}"},
+                            status=400,
+                        )
+                        return
                     netlist = bounded
-                result = validate(safe_files, netlist=netlist)
+                try:
+                    result = validate(safe_files, netlist=netlist)
+                except OSError as exc:
+                    # Unreadable input is a readable 4xx, not a dropped
+                    # connection -- the body-bounds contract applied to file
+                    # I/O.
+                    self._send_json(
+                        {"error": f"cannot read input: {exc}"},
+                        status=400,
+                    )
+                    return
             self._send_json(result.to_dict())
         elif parsed.path == "/api/generate":
             from ..generate.generator import (

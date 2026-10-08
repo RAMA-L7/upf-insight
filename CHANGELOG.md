@@ -198,6 +198,39 @@ designer's (well-formed) UPF.
   `scripts/generate_rules_registry.py`, with a test that fails on drift. It
   previously documented 65 rules and omitted UPF-085..100 entirely.
 
+### Fixed - CI: golden drift, a Windows-only test, and a gate that asserted the wrong verdict
+
+Three jobs were red on `main` and on this branch. Two were pre-existing; one
+was introduced by the engine work above.
+
+- **Golden contract (`engine-contract`)** - the parser change above moves rule
+  output, and the recorded signatures were never refreshed, so the job broke on
+  this branch (it was green on `main`). Re-recorded with
+  `python scripts/run_golden.py --update`; 18 fixtures, three of them changed:
+  `UPF-031` 1->2 (`example.pst_bad`), `UPF-038` subject gains its driving
+  supply (`DRV2`) (`example.pst_cross_bad`), and on
+  `user_coverage_example.upf` the 30 false `UPF-002` option-illegality errors
+  are gone while `UPF-031` 6->16, `UPF-040` 0->3 and `UPF-050` 0->1 now fire
+  because the model actually builds (errors 52->32). Every one of these is the
+  documented consequence of splitting multi-line commands at brace depth 0.
+- **Local API (`api_server`)** - a path that passed the workspace-root bound
+  but did not exist reached the engine, raised `FileNotFoundError`, and killed
+  the connection. Nonexistent files and netlists now return a readable 400,
+  and an unreadable input is caught as a 400 rather than a dropped connection.
+- **Tests** - `test_validate_out_of_root_file_returns_400` hardcoded
+  `C:\Windows\win.ini`, which only exercises the root bound on Windows. On
+  POSIX that string is a *relative* name that resolves inside the root, so the
+  test failed on ubuntu and macos with a dropped connection. It now uses an
+  existing temp file outside the root, and a new test asserts that a missing
+  in-root path returns 400 rather than dropping the connection. `_post` also
+  returns the real error body instead of discarding it.
+- **CI gate** - `cpu_subsys_v2.upf` is the *deliberately* regressed fixture
+  (the 1.8 V level shifter declared in v1 was removed), so
+  `GATE [NO_READINESS_REGRESSION] 3 new blocker(s)` -> FAIL is the detector
+  working. The job exited non-zero because it expected a PASS. It now runs the
+  gate with `continue-on-error` and asserts the verdict is `FAIL`, so the job
+  is green precisely while the planted UPF-061 regression is still blocked.
+
 ## [0.3.0] - 2026-08-23
 
 ### Added - sdc-tools parity sprint
