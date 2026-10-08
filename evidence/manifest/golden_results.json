@@ -742,6 +742,16 @@
         "subject": ""
       },
       {
+        "rule": "UPF-025",
+        "severity": "info",
+        "subject": ""
+      },
+      {
+        "rule": "UPF-032",
+        "severity": "warning",
+        "subject": ""
+      },
+      {
         "rule": "UPF-036",
         "severity": "warning",
         "subject": ""
@@ -773,7 +783,7 @@
       }
     ],
     "readiness": "BLOCKED",
-    "warning_count": 9
+    "warning_count": 10
   },
   {
     "error_count": 0,

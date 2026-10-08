@@ -253,10 +253,12 @@ class Handler(BaseHTTPRequestHandler):
                     netlist = bounded
                 try:
                     result = validate(safe_files, netlist=netlist)
-                except OSError as exc:
-                    # Unreadable input is a readable 4xx, not a dropped
-                    # connection -- the body-bounds contract applied to file
-                    # I/O.
+                except (OSError, ValueError) as exc:
+                    # Unreadable or undecodable input is a readable 4xx, not
+                    # a dropped connection -- the body-bounds contract
+                    # applied to file I/O. ValueError covers a non-UTF-8
+                    # file, which preprocess_file now reports instead of
+                    # silently mangling to U+FFFD.
                     self._send_json(
                         {"error": f"cannot read input: {exc}"},
                         status=400,

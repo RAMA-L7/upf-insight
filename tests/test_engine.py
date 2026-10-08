@@ -384,3 +384,98 @@ def test_design_aware_golden_is_silent():
     result = validate([f"{EXAMPLES}/example.soc.upf"])
     assert not any(f.rule.startswith("UPF-08")
                    for f in result.check.findings)
+
+
+# ---------------------------------------------------------------------------
+# Three engine defects documented as out of scope in PR #1, now fixed.
+# ---------------------------------------------------------------------------
+
+
+def test_add_power_state_populates_supply_states():
+    """The legacy form must still declare its state.
+
+    add_power_state was recognised but never stored, so model.supply_states
+    stayed empty and every rule consuming it was unreachable for files using
+    the deprecated command.
+    """
+    for cmd in ("add_supply_state", "add_power_state"):
+        upf = f"upf_version 3.0\ncreate_supply_net VDD\n{cmd} VDD -state {{HIGH 1.0}}\n"
+        model = build_model(preprocess(upf, file="t.upf"))
+        assert len(model.supply_states) == 1, cmd
+        st = model.supply_states[0]
+        assert (st.name, st.parent, st.voltage) == ("HIGH", "VDD", 1.0), cmd
+
+
+def test_add_power_state_reaches_pst_rules():
+    """UPF-025/UPF-032 must fire through add_power_state as well."""
+    from upf_insight.engine.engine import validate_records
+
+    upf = "upf_version 3.0\ncreate_supply_net VDD\nadd_power_state VDD -state {HIGH 1.0}\n"
+    codes = {f.rule for f in
+             validate_records(preprocess(upf, file="t.upf")).check.findings}
+    assert "UPF-025" in codes   # declared but never referenced
+    assert "UPF-032" in codes   # power states exist, no create_pst
+
+
+def test_add_power_state_on_domain_is_not_undefined_supply():
+    """add_power_state's element may be a supply, a domain or a PST.
+
+    Asserting kind="supply" unconditionally made UPF-010 claim a *defined*
+    domain was an undefined supply -- an error-grade VALIDATED finding.
+    """
+    from upf_insight.engine.engine import validate_records
+
+    upf = ("upf_version 3.0\ncreate_supply_net vdd\n"
+           "create_power_domain PD_CPU -elements {u1}\n"
+           "add_power_state PD_CPU -state {ON 1.0}\n")
+    result = validate_records(preprocess(upf, file="t.upf"))
+    assert not any(f.rule == "UPF-010" for f in result.check.findings)
+
+
+def test_add_state_transition_targets_one_pst_only():
+    """A transition belongs to the table in context, not to every table.
+
+    Appending to all tables put one designer's transition on unrelated
+    power-state tables; IEEE 1801 gives the command no -pst option.
+    """
+    model = build_model(preprocess("""upf_version 3.0
+create_pst PST_A -annotation PA
+add_pst_state ON PST_A -state {1.0}
+create_pst PST_B -annotation PB
+add_pst_state ON PST_B -state {1.0}
+add_state_transition OFF -next_state ON
+""", file="t.upf"))
+    total = sum(len(p.transitions) for p in model.psts.values())
+    assert total == 1
+    assert model.psts["PST_B"].transitions == [("OFF", "ON")]
+    assert model.psts["PST_A"].transitions == []
+
+
+def test_preprocess_file_rejects_invalid_utf8(tmp_path):
+    """A mis-decoded byte must fail loudly, never mangle to U+FFFD.
+
+    errors="replace" turned PD_caf+0xe9 into a replacement character, a name
+    that can never match its own references -- a wrong verdict on a signoff
+    artifact is worse than no verdict.
+    """
+    bad = tmp_path / "bad.upf"
+    raw = b"upf_version 3.0\ncreate_power_domain PD_caf\xe9 -elements {u1}\n"
+    bad.write_bytes(raw)
+
+    with pytest.raises(ValueError) as exc:
+        preprocess_file(bad)
+    msg = str(exc.value)
+    assert "not valid UTF-8" in msg
+    assert "byte 42" in msg          # names the exact offset
+    assert "bad.upf" in msg          # names the file
+    assert bad.read_bytes() == raw   # never rewrites the input
+
+
+def test_preprocess_file_accepts_valid_utf8(tmp_path):
+    """Strict decoding must not reject legitimate UTF-8, incl. non-ASCII."""
+    good = tmp_path / "ok.upf"
+    good.write_text("upf_version 3.0\n# caf\u00e9 ok\n"
+                    "create_power_domain PD_A\n", encoding="utf-8")
+    records = preprocess_file(good)
+    assert [r.command_name for r in records] == ["upf_version",
+                                                 "create_power_domain"]

@@ -216,9 +216,26 @@ def preprocess(text: str, file: str = "<string>") -> List[CommandRecord]:
 
 
 def preprocess_file(path: str | Path) -> List[CommandRecord]:
-    """Preprocess a single .upf file into command records."""
+    """Preprocess a single .upf file into command records.
+
+    Decoding is strict on purpose. ``errors="replace"`` used to turn an
+    undecodable byte into U+FFFD, which is invisible in the output: a domain
+    named ``PD_caf\xe9`` became ``PD_caf�`` in the model and could then never
+    match its own references, manufacturing false UPF-024/025 findings against
+    a file that was merely saved in the wrong encoding. For a signoff artifact
+    a wrong verdict is worse than no verdict, so the mis-decode is raised with
+    the file and offset instead of being papered over.
+    """
     p = Path(path)
-    return preprocess(p.read_text(encoding="utf-8", errors="replace"), str(p))
+    data = p.read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"{p}: not valid UTF-8 at byte {exc.start} "
+            f"({exc.reason}); re-save the file as UTF-8"
+        ) from exc
+    return preprocess(text, str(p))
 
 
 def preprocess_many(paths: Iterable[str | Path]) -> List[CommandRecord]:

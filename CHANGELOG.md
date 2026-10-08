@@ -7,6 +7,43 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed - three engine defects deferred from PR #1 — 2026-10-09
+
+All three were listed as "found, not fixed here" to keep that diff
+reviewable.
+
+- **`add_power_state` dropped its declaration.** The command was recognised
+  but never stored, so `model.supply_states` stayed empty and every rule
+  consuming it (UPF-025, UPF-030, UPF-032) was unreachable for files using
+  the legacy form. It now populates `supply_states` exactly as
+  `add_supply_state` does, while UPF-005 still flags it as deprecated. Its
+  first argument is deliberately *not* asserted as a supply reference: IEEE
+  1801 allows a supply, a power domain or a PST name there, and
+  hard-coding `kind="supply"` made UPF-010 claim a *defined* domain was an
+  undefined supply — an error-grade `VALIDATED` finding. That false positive
+  was caught during this work and is now covered by a test.
+- **`add_state_transition` appended to every PST.** Already fixed on `main`
+  by `3ffa0b2`, which landed *inside* PR #1 after its description was
+  written — so the "out of scope" list was stale, not the code. It now
+  targets the table in context; covered here by a regression test so it
+  cannot silently regress.
+- **`preprocess_file` silently mangled non-UTF-8 input.** `errors="replace"`
+  turned an undecodable byte into U+FFFD, so `PD_café` became
+  `PD_caf�` in the model and could never match its own references —
+  manufacturing false findings against a file that was merely saved in the
+  wrong encoding. Decoding is now strict: a `ValueError` names the file and
+  the exact byte offset. 0 of 31 UPF/Tcl files in this repo fail strict
+  UTF-8, so nothing legitimate breaks. The local API maps it to a 400
+  rather than dropping the connection (`UnicodeDecodeError` subclasses
+  `ValueError`, which the pre-existing `except OSError` would have missed).
+
+- Golden: `example.syn_ref_bad.upf` gains `UPF-025` (info) and `UPF-032`
+  (warning), `warning_count` 9 -> 10. Both adjudicated against ground truth
+  (`create_pst` count = 0; no supply-set function references `PON`) — they
+  are exactly the two rules PR #1 reported as unreachable.
+- Tests: 6 regression tests in `test_engine.py`, verified non-vacuous by
+  reverting the fixes and confirming 3 of them fail against unfixed code.
+
 ### Added - MCP server now covers every feature (8 -> 19 tools) — 2026-10-08
 
 `upf-insight-mcp` exposed 8 tools while the CLI had 16 commands and the API

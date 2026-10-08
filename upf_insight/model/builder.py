@@ -813,11 +813,26 @@ def _dispatch(model: PowerIntentModel, cmd: str, args: List[str], rec: CommandRe
             )
         )
     # add_port_state / add_supply_state / add_power_state / add_state_transition
-    elif cmd in ("add_port_state", "add_supply_state"):
+    #
+    # add_power_state is deprecated (UPF-005 fires separately, from
+    # _DEPRECATED_FORMS), but a deprecated command still *declares* a supply
+    # state and the model has to record it. Skipping it left model.supply_states
+    # empty, so UPF-025/030/032 could not fire for any file using the legacy
+    # form -- the engine silently lost the declaration instead of judging it.
+    elif cmd in ("add_port_state", "add_supply_state", "add_power_state"):
         from .power_model import SupplyState
 
         parent = args[0] if args else ""
-        _track_reference(model, "supply", parent, line)
+        if cmd != "add_power_state":
+            # add_port_state/add_supply_state take a supply by definition, so
+            # the reference is safe to assert. add_power_state's element may
+            # equally be a supply, a power domain or a PST name; asserting
+            # kind="supply" for it manufactured UPF-010 errors against
+            # *defined* domains ("Supply 'PD_CPU' is referenced but never
+            # defined"), which is an error-grade, VALIDATED claim. Record the
+            # declaration either way, but only assert the reference when the
+            # element is unambiguously a supply.
+            _track_reference(model, "supply", parent, line)
         for i, a in enumerate(args):
             if a == "-state" and i + 1 < len(args):
                 pair = _split_pair(args[i + 1])
