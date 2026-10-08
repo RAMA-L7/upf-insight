@@ -7,6 +7,38 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added - MCP server now covers every feature (8 -> 19 tools) — 2026-10-08
+
+`upf-insight-mcp` exposed 8 tools while the CLI had 16 commands and the API
+11 routes, so an agent could not reach half the engine. Every remaining
+feature now has one tool, bound to the same engine code path as the CLI:
+
+- **New tools** - `upf_relations` (domain relation matrix), `upf_analyze`
+  (end-to-end with optional netlist), `upf_report` (json/text/html),
+  `upf_rule_show` (full detail for one rule code, case-insensitive),
+  `upf_rules_audit` (registry/handler sync + `test_ref` resolution),
+  `upf_batch` (validate a directory), `upf_lint`, `upf_convert` (json/yaml),
+  `upf_quality` (adversarial mutation corpus), `upf_whats_new`, and
+  `upf_version`.
+- **Read-only by construction** - `upf_lint` calls `lint_file(check_only=True,
+  fix=False)` so it can never rewrite a file, and `upf_batch` runs
+  `batch_check` only, never the report writer.
+- **Same workspace guard** - the new path-taking tools (`batch`, `lint`,
+  `convert`, `report`, `analyze`, `relations`) resolve through `_bounded()`;
+  `upf_batch` adds `_require_dir()` so a directory is bounded too. Tests
+  assert each one rejects `../../etc/passwd`.
+- Tests: 8 -> 28 in `test_mcp_server.py`, including one case per new tool and
+  a check that every schema carries a description so an agent can choose.
+
+### Fixed - MCP serve loop crashed when the client disconnected
+
+`stdout.write`/`flush` sat outside the try block, so a host shutting down
+mid-session raised `OSError` out of the serve loop and killed the server -
+contradicting the module's own contract that the loop never crashes. The
+write is now guarded and a dead peer ends the loop quietly, matching normal
+MCP lifecycle. Found by running the real `upf-insight-mcp` binary over a
+pipe, not by the in-process tests.
+
 ### Measured - external corpora re-validated (AnyCore 65% -> 1.4%, Tenstorrent 100% -> 0%) — 2026-10-03
 
 Both external corpora named in `docs/validation/REAL_WORLD_REPORT.md` were

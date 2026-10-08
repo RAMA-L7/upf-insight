@@ -217,6 +217,178 @@ def _tool_upf_gate(state: McpState, args: dict) -> dict:
     }
 
 
+def _require_dir(state: McpState, args: dict, key: str = "path") -> str:
+    """Like _require_path but for a directory that must stay inside the root."""
+    raw = args.get(key)
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(f"'{key}' must be a non-empty string path")
+    bounded = _bounded(state, raw)
+    if bounded is None:
+        raise ValueError(f"path outside workspace root: {raw}")
+    if not os.path.isdir(bounded):
+        raise ValueError(f"directory not found: {raw}")
+    return bounded
+
+
+def _tool_upf_relations(state: McpState, args: dict) -> dict:
+    """Power-domain relation matrix: cross-domain interactions only."""
+    result = validate([_require_path(state, args)])
+    rel = result.relations
+    if rel is None:
+        return {"relations": None, "note": "no relation data available"}
+    return {"relations": rel.to_dict()}
+
+
+def _tool_upf_analyze(state: McpState, args: dict) -> dict:
+    """End-to-end analysis: validate with an optional netlist and summarize."""
+    netlist_raw = args.get("netlist")
+    netlist = _require_path(state, args, "netlist") if netlist_raw else None
+    result = validate([_require_path(state, args)], netlist=netlist)
+    check = result.check
+    summary = {
+        "files": result.file_count,
+        "commands": result.command_count,
+        "errors": check.error_count,
+        "warnings": check.warning_count,
+        "infos": check.info_count,
+        "clean": result.clean,
+        "readiness": result.readiness.overall if result.readiness else "UNKNOWN",
+    }
+    if result.coverage is not None:
+        summary["domain_coverage"] = result.coverage.domain_coverage
+        summary["supply_coverage"] = result.coverage.supply_coverage
+    if result.interactions is not None:
+        summary["interactions"] = len(result.interactions.interactions)
+    if result.wildcards is not None and result.wildcards.summary:
+        summary["wildcards"] = result.wildcards.summary
+    if result.design_coverage is not None:
+        dc = result.design_coverage
+        summary["design_coverage"] = {
+            "status": dc.status,
+            "unconstrained_inputs": len(dc.unconstrained_inputs),
+            "unconstrained_outputs": len(dc.unconstrained_outputs),
+        }
+    return {"summary": summary, "result": result.to_dict()}
+
+
+def _tool_upf_report(state: McpState, args: dict) -> dict:
+    """Human-readable report: json (default), text, or html."""
+    from ..report.reporter import format_html, format_json, format_text
+
+    result = validate([_require_path(state, args)])
+    fmt = args.get("format", "json")
+    if fmt == "json":
+        return {"format": "json", "report": json.loads(format_json(result))}
+    if fmt == "text":
+        return {"format": "text", "report": format_text(result)}
+    if fmt == "html":
+        return {"format": "html", "report": format_html(result)}
+    raise ValueError("'format' must be one of: json, text, html")
+
+
+def _tool_upf_rule_show(state: McpState, args: dict) -> dict:
+    """Full detail for one rule code (the `rules show` view)."""
+    from ..engine.rules.rules_registry import registered_rules
+
+    code = args.get("code")
+    if not isinstance(code, str) or not code.strip():
+        raise ValueError("'code' must be a non-empty rule code (e.g. UPF-038)")
+    rule = next((r for r in registered_rules()
+                 if r.code.upper() == code.strip().upper()), None)
+    if rule is None:
+        raise ValueError(f"unknown rule code: {code}")
+    return {
+        "code": rule.code,
+        "title": rule.title,
+        "severity": rule.severity,
+        "layer": rule.layer,
+        "context": rule.context,
+        "semantic_inputs": list(rule.semantic_inputs),
+        "depends_on": list(rule.depends_on),
+        "description": rule.description,
+        "test_ref": rule.test_ref,
+    }
+
+
+def _tool_upf_rules_audit(state: McpState, args: dict) -> dict:
+    """Audit the rule registry: handler/registry sync and test_ref resolution."""
+    from ..engine.rules.audit import audit_registry
+
+    return audit_registry()
+
+
+def _tool_upf_batch(state: McpState, args: dict) -> dict:
+    """Validate every UPF/Tcl file under a directory (read-only)."""
+    from pathlib import Path
+
+    from ..tools.batch_runner import batch_check
+
+    directory = _require_dir(state, args)
+    br = batch_check(Path(directory), format="text")
+    return {
+        "directory": directory,
+        "total_files": br.total_files,
+        "passed": br.passed,
+        "failed": br.failed,
+        "per_file": br.per_file,
+    }
+
+
+def _tool_upf_lint(state: McpState, args: dict) -> dict:
+    """Lint a UPF/Tcl file for formatting issues. Read-only: never rewrites."""
+    from ..tools.linter import lint_file
+
+    path = _require_path(state, args)
+    lr = lint_file(path, check_only=True, fix=False)
+    return {
+        "path": path,
+        "clean": not lr.issues,
+        "would_change": lr.changed,
+        "issue_count": len(lr.issues),
+        "issues": [{"line": i.line, "rule": i.rule, "message": i.message}
+                   for i in lr.issues],
+    }
+
+
+def _tool_upf_convert(state: McpState, args: dict) -> dict:
+    """Convert a UPF file to JSON or YAML."""
+    from ..tools.converter import upf_to_json, upf_to_yaml
+
+    path = _require_path(state, args)
+    fmt = args.get("format", "json")
+    if fmt == "json":
+        return {"format": "json", "text": upf_to_json(path)}
+    if fmt == "yaml":
+        return {"format": "yaml", "text": upf_to_yaml(path)}
+    raise ValueError("'format' must be 'json' or 'yaml'")
+
+
+def _tool_upf_quality(state: McpState, args: dict) -> dict:
+    """Run the canonical adversarial mutation corpus and report metrics."""
+    from ..engine.quality import run_quality_report
+
+    return run_quality_report().to_dict()
+
+
+def _tool_upf_whats_new(state: McpState, args: dict) -> dict:
+    """Offline release notes (newest first); all=True for full history."""
+    from ..engine.meta.release_notes import RELEASE_NOTES, latest_version
+
+    include_all = bool(args.get("all", False))
+    versions = list(RELEASE_NOTES) if include_all else list(RELEASE_NOTES)[:3]
+    return {
+        "installed_version": __version__,
+        "latest_version": latest_version(),
+        "up_to_date": latest_version() == __version__,
+        "releases": {v: RELEASE_NOTES[v] for v in versions},
+    }
+
+
+def _tool_upf_version(state: McpState, args: dict) -> dict:
+    """Package name and version."""
+    return {"name": "upf-insight", "version": __version__}
+
+
 _TOOLS: List[dict] = [
     {
         "name": "upf_validate",
@@ -287,6 +459,113 @@ _TOOLS: List[dict] = [
             },
         },
     },
+    {
+        "name": "upf_relations",
+        "description": ("Power-domain relation matrix for a UPF file: domains, "
+                        "their ALWAYS_ON/SWITCHABLE types, cross-domain "
+                        "relations with evidence, and the relation matrix."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_analyze",
+        "description": ("One-shot end-to-end analysis: validate a UPF file "
+                        "(optionally with a Verilog/JSON netlist) and return "
+                        "a summary plus full engine evidence."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"},
+                           "netlist": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_report",
+        "description": ("Human-readable validation report for a UPF file in "
+                        "json (default), text, or html."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"},
+                           "format": {"type": "string",
+                                      "enum": ["json", "text", "html"]}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_rule_show",
+        "description": ("Full detail for a single rule code: severity, layer, "
+                        "context, semantic inputs, dependencies, description "
+                        "and regression test reference."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"code": {"type": "string",
+                                     "description": "e.g. UPF-038"}},
+            "required": ["code"],
+        },
+    },
+    {
+        "name": "upf_rules_audit",
+        "description": ("Audit the rule registry: handler/registry sync and "
+                        "that every test_ref resolves to a real test."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "upf_batch",
+        "description": ("Validate every UPF/Tcl file under a directory "
+                        "(recursively) and report per-file results. Read-only."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string",
+                                     "description": "directory inside the workspace"}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_lint",
+        "description": ("Lint a UPF/Tcl file for formatting issues (canonical "
+                        "commands, trailing whitespace, balanced braces). "
+                        "Read-only: never rewrites the file."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_convert",
+        "description": "Convert a UPF file to a JSON or YAML structural dump.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"},
+                           "format": {"type": "string",
+                                      "enum": ["json", "yaml"]}},
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "upf_quality",
+        "description": ("Run the canonical adversarial mutation corpus and "
+                        "report detection rate, precision and per-category "
+                        "metrics for the engine itself."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "upf_whats_new",
+        "description": ("Offline release notes, newest first (top 3 by "
+                        "default; all=True for full history)."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"all": {"type": "boolean"}},
+        },
+    },
+    {
+        "name": "upf_version",
+        "description": "Package name and version of the installed engine.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 _HANDLERS: Dict[str, Callable[[McpState, dict], dict]] = {
@@ -298,6 +577,17 @@ _HANDLERS: Dict[str, Callable[[McpState, dict], dict]] = {
     "upf_generate": _tool_upf_generate,
     "upf_rules": _tool_upf_rules,
     "upf_gate": _tool_upf_gate,
+    "upf_relations": _tool_upf_relations,
+    "upf_analyze": _tool_upf_analyze,
+    "upf_report": _tool_upf_report,
+    "upf_rule_show": _tool_upf_rule_show,
+    "upf_rules_audit": _tool_upf_rules_audit,
+    "upf_batch": _tool_upf_batch,
+    "upf_lint": _tool_upf_lint,
+    "upf_convert": _tool_upf_convert,
+    "upf_quality": _tool_upf_quality,
+    "upf_whats_new": _tool_upf_whats_new,
+    "upf_version": _tool_upf_version,
 }
 
 
@@ -396,8 +686,14 @@ def serve(stdin: Any = None, stdout: Any = None) -> None:
                 rid = request.get("id") if isinstance(request, dict) else None
                 response = _rpc_error(rid, INVALID_REQUEST, f"internal error: {exc}")
         if response is not None:
-            stdout.write(json.dumps(response, default=str) + "\n")
-            stdout.flush()
+            try:
+                stdout.write(json.dumps(response, default=str) + "\n")
+                stdout.flush()
+            except OSError:
+                # The client closed the pipe (host shut down, or the caller
+                # stopped reading). A disconnected peer is a normal MCP
+                # lifecycle event, not a crash: stop the loop quietly.
+                break
 
 
 __all__ = ["McpState", "serve", "handle_request"]

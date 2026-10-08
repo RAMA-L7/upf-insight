@@ -29,9 +29,12 @@ RELEASE_NOTES: dict[str, list[str]] = {
         "and 'rules show CODE' with severity/search filters.",
         "Custom rule sets: declarative YAML rules (--custom-rules) let teams "
         "enforce house style alongside the built-in registry.",
-        "MCP server: 'upf-insight-mcp' exposes 8 deterministic tools over "
+        "MCP server: 'upf-insight-mcp' exposes 19 deterministic tools over "
         "JSON-RPC stdio for agent integration while keeping the engine "
-        "LLM-free.",
+        "LLM-free. One tool per CLI/API feature: validate, model, pst, "
+        "coverage, relations, analyze, report, diff, generate, rules, "
+        "rule_show, rules_audit, gate, batch, lint, convert, quality, "
+        "whats_new and version.",
         "CI hardening: GitHub Actions workflow (3-OS x Python 3.10-3.12), "
         "reusable upf-gate composite action, pre-commit hook for staged "
         ".upf/.tcl files, evidence manifest and golden runner scripts.",

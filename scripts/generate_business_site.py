@@ -526,7 +526,7 @@ FEATURE_DATA = [
     ("âŸ", "integrations", "CLI, web workspace, MCP",
      "One deterministic engine, three ways in.",
      ["Local vanilla-JS workspace: 22 pages, stdlib HTTP server, no build step",
-      "MCP server exposing eight tools over JSON-RPC stdio",
+      "MCP server exposing 19 tools over JSON-RPC stdio",
       "The engine itself stays LLM-free"],
      "$ upf-insight web          # http://localhost:8585\n$ upf-insight-mcp           # JSON-RPC over stdio"),
 ]
