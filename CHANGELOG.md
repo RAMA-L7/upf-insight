@@ -7,7 +7,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Measured - external corpora re-validated (AnyCore 65% -> 1.4%, Tenstorrent 100% -> 0%)
+### Measured - external corpora re-validated (AnyCore 65% -> 1.4%, Tenstorrent 100% -> 0%) — 2026-10-03
 
 Both external corpora named in `docs/validation/REAL_WORLD_REPORT.md` were
 located on this host and re-measured against the current engine. The historical
@@ -36,7 +36,7 @@ by measurements.
   UPF -> design-aware validation, including a negative control proving a
   genuinely absent signal is still reported.
 
-### Fixed - nine defects found only in real open-source UPF
+### Fixed - nine defects found only in real open-source UPF — 2026-10-03
 
 None of these were visible from the shipped corpus; each was found by running
 the external corpora and inspecting the original UPF construct.
@@ -68,7 +68,7 @@ the external corpora and inspecting the original UPF construct.
   {ret_en high}` could never match. Now split into `save_signal_name` /
   `save_signal_sense`, verified against a synthesized netlist.
 
-### Fixed - real-world false positives (shipped corpus now 0%)
+### Fixed - real-world false positives (shipped corpus now 0%) — 2026-10-02
 
 The parser and grammar defects recorded in the v0.3.0 validation report are
 fixed. False-positive rate on `tests/corpus/` goes from **44% (15 of 34) to 0%
@@ -108,7 +108,7 @@ in this repository. Their defects were grammar-level and are fixed, so those
 figures are a historical upper bound, not a current claim. See
 `docs/validation/REAL_WORLD_REPORT.md`.
 
-### Added - real-world validation (tag v0.3.0-validation.1)
+### Added - real-world validation (tag v0.3.0-validation.1) — 2026-10-01
 
 - `scripts/validate_corpus.py` — runs the CLI over an external UPF corpus,
   buckets every finding by root cause, and reports a false-positive rate.
@@ -129,7 +129,7 @@ figures are a historical upper bound, not a current claim. See
 - `docs/validation/REAL_WORLD_REPORT.md` — methodology, corpus, per-defect
   analysis, and prioritized improvements.
 
-### Measured result at v0.3.0 (superseded for the shipped corpus — see Fixed above)
+### Measured result at v0.3.0 (superseded for the shipped corpus — see Fixed above) — 2026-10-02
 
 **56% false-positive rate on UPF the tool did not write** (53 of 95 findings),
 against a 100% mutation-detection rate on defects the same author injected.
@@ -145,7 +145,7 @@ into a false UPF-076.
 P0 fixes are tracked in the validation report. Until they land, the tool
 should not be used as a CI gate.
 
-### Fixed - cross-file scope semantics (behavior change)
+### Fixed - cross-file scope semantics (behavior change) — 2026-10-01
 
 Scope is now per-file state. Previously `model.current_scope` was never
 reset between files, so a UPF file that omitted `set_scope` silently
@@ -171,21 +171,21 @@ duplicate top-level supply definition across files now surfaces as
 No new rule code was added: this corrects the model rather than flagging the
 designer's (well-formed) UPF.
 
-### Fixed - support-boundary honesty
+### Fixed - support-boundary honesty — 2026-10-01
 
 - `checker`: a rule that raised is now reported with `support=NOT_VALIDATED`
   instead of `VALIDATED`. An internal crash proved nothing about the design.
 - `checker`: `CheckResult.support_boundary` is populated from
   `compute_support_boundary()`; it was serialized but always `{}`.
 
-### Fixed - local API input bounds
+### Fixed - local API input bounds — 2026-10-01
 
 - `api_server`: request bodies are capped at 8 MiB (413 on overflow).
 - `api_server`: a malformed or non-object JSON body now returns a readable
   4xx instead of dropping the connection. Applies to `/api/validate`,
   `/api/generate`, `/api/diff`, `/api/gate`, and `/api/report`.
 
-### Tests
+### Tests — 2026-10-01
 
 - Added regression tests for cross-file scope: bleed, file-order
   independence, and `load_upf -scope` inheritance.
@@ -198,7 +198,7 @@ designer's (well-formed) UPF.
   `scripts/generate_rules_registry.py`, with a test that fails on drift. It
   previously documented 65 rules and omitted UPF-085..100 entirely.
 
-### Fixed - CI: golden drift, a Windows-only test, and a gate that asserted the wrong verdict
+### Fixed - CI: golden drift, a Windows-only test, and a gate that asserted the wrong verdict — 2026-10-08
 
 Three jobs were red on `main` and on this branch. Two were pre-existing; one
 was introduced by the engine work above.
